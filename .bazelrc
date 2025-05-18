@@ -1,0 +1,57 @@
+# import user specific bazelrc
+import %workspace%/.bazelrc.local
+
+# Auto-detect host platform and set appropriate config
+build --enable_platform_specific_config
+
+# Platform-specific configurations
+build:macos_arm64 --host_cpu=darwin_arm64
+build:macos_arm64 --cpu=darwin_arm64
+
+build:macos_x86_64 --host_cpu=darwin
+build:macos_x86_64 --cpu=darwin
+
+build:linux_x86_64 --host_cpu=k8
+build:linux_x86_64 --cpu=k8
+
+build --local_resources=cpu=8
+build --local_resources=memory=8192
+
+# Enable bzlmod
+common --enable_bzlmod
+
+# Use the Bazel-managed Go SDK
+build --action_env=GO111MODULE=off
+
+# Common settings
+build --incompatible_enable_cc_toolchain_resolution
+
+# Go specific settings
+build --define=GOTAGS=linux,darwin
+
+# Optimize for release builds
+build:release -c opt
+build:release --strip=always
+
+# Debug build configuration
+build:debug -c dbg
+
+# Default to optimized builds
+build -c opt
+
+# Use sandboxing for improved reproducibility
+build --spawn_strategy=sandboxed
+
+# Improve caching
+build --remote_download_outputs=minimal
+
+# test
+test --test_output=errors
+test --verbose_failures
+test --test_summary=detailed
+
+# Auto-select the appropriate config based on the host platform
+build:linux --config=linux_x86_64
+build:macos --config=macos_x86_64
+build:macos_arm64 --config=macos_arm64
+
