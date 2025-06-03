@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira Label Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Sidebar styles */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            background-color: #f8f9fa;
+            width: 250px;
+        }
+
+        .sidebar-sticky {
+            position: relative;
+            top: 0;
+            height: calc(100vh - 48px);
+            padding-top: .5rem;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .sidebar .nav-link {
+            font-weight: 500;
+            color: #333;
+            padding: 0.5rem 1rem;
+            margin: 0.2rem 0;
+            border-radius: 0.25rem;
+        }
+
+        .sidebar .nav-link:hover {
+            background-color: #e9ecef;
+        }
+
+        .sidebar .nav-link.active {
+            color: #2470dc;
+            background-color: #e9ecef;
+        }
+
+        .sidebar .nav-link i {
+            margin-right: 0.5rem;
+            color: #999;
+        }
+
+        .sidebar .nav-link.active i {
+            color: #2470dc;
+        }
+
+        /* Main content styles */
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+
+        /* Existing styles */
+        .label-card {
+            transition: all 0.3s ease;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+        .label-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .action-buttons {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .label-card:hover .action-buttons {
+            opacity: 1;
+        }
+        .loading-spinner {
+            display: none;
+            margin: 20px auto;
+        }
+        .error-message {
+            display: none;
+            margin: 20px auto;
+            color: #dc3545;
+        }
+        .success-message {
+            display: none;
+            margin: 20px auto;
+            color: #198754;
+        }
+
+        /* Header styles */
+        .navbar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 250px;
+            z-index: 1030;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+        }
+
+        .navbar-brand {
+            padding-left: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-sticky">
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#">
+                        <i class="fas fa-tags"></i>
+                        Label Manager
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="fas fa-chart-line"></i>
+                        Sprint Report
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="fas fa-tasks"></i>
+                        Tasks
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="fas fa-chart-bar"></i>
+                        Reports
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="fas fa-cog"></i>
+                        Settings
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Top right header -->
+    <header style="position: fixed; top: 0; right: 0; left: 250px; height: 56px; background: #fff; z-index: 1030; box-shadow: 0 2px 4px rgba(0,0,0,.05); display: flex; align-items: center; justify-content: flex-end; padding-right: 2rem;">
+        <span style="font-size: 1.15rem; font-weight: 600; color: #333;">Jira Management System</span>
+    </header>
+
+    <!-- Main content -->
+    <main class="main-content" style="margin-top: 56px;">
+        <div class="container-fluid py-4">
+            <h2 class="mb-4" id="mainTitle" style="font-size: 1.5rem; font-weight: 600; color: #222;">Label Manager</h2>
+
+            <!-- Sprint Report Content (hidden by default) -->
+            <div id="sprintReportSection" style="display: none;">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Sprint Report</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="sprintBoardSelect" class="form-label">Select Board</label>
+                            <select id="sprintBoardSelect" class="form-select">
+                                <option value="">Loading boards...</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <button class="btn btn-primary" id="generateSprintReportBtn" disabled>Generate Report</button>
+                            <button class="btn btn-outline-success ms-2" id="downloadSprintReportCsvBtn" disabled>Download CSV</button>
+                        </div>
+                        <div id="sprintReportLoading" class="my-4" style="display:none;">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border text-primary me-2" role="status"></div>
+                                <span>Loading sprint report...</span>
+                            </div>
+                        </div>
+                        <div id="sprintReportError" class="alert alert-danger" style="display:none;"></div>
+                        <div id="sprintReportTableWrapper" style="display:none;">
+                            <h5 class="mb-3">Last 4 Closed Sprints</h5>
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr id="sprintReportTableHead"></tr>
+                                </thead>
+                                <tbody id="sprintReportTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Label Manager Content (default) -->
+            <div id="labelManagerSection">
+                <!-- Loading Spinner -->
+                <div id="loadingSpinner" class="loading-spinner text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading labels...</p>
+                </div>
+
+                <!-- Error Message -->
+                <div id="errorMessage" class="error-message alert alert-danger text-center"></div>
+
+                <!-- Success Message -->
+                <div id="successMessage" class="success-message alert alert-success text-center"></div>
+
+                <!-- Labels List -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Available Labels</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="input-group me-3" style="width: 300px;">
+                                <input type="text" class="form-control" id="searchInput" placeholder="Type at least 2 characters to search...">
+                                <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                            <button class="btn btn-outline-secondary me-2" id="refreshLabels">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addLabelModal">
+                                <i class="fas fa-plus"></i> Add New Label
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="searchStatus" class="text-center mb-3" style="display: none;">
+                            <small class="text-muted">Searching...</small>
+                        </div>
+                        <div id="searchInfo" class="text-center mb-3" style="display: none;">
+                            <small class="text-muted"></small>
+                        </div>
+                        <div class="row" id="labelsContainer">
+                            <!-- Labels will be dynamically added here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Label Modal -->
+    <div class="modal fade" id="addLabelModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Label</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addLabelForm">
+                        <div class="mb-3">
+                            <label for="newLabel" class="form-label">Label Name</label>
+                            <input type="text" class="form-control" id="newLabel" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveNewLabel">Add Label</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Label Modal -->
+    <div class="modal fade" id="renameModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Rename Label</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="renameForm">
+                        <input type="hidden" id="oldLabel">
+                        <div class="mb-3">
+                            <label for="newLabelName" class="form-label">New Label Name</label>
+                            <input type="text" class="form-control" id="newLabelName" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveRename">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Show loading spinner
+        function showLoading() {
+            document.getElementById('loadingSpinner').style.display = 'block';
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'none';
+        }
+
+        // Hide loading spinner
+        function hideLoading() {
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Show success message
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Function to display labels
+        function displayLabels(labels, searchInfo = null) {
+            const container = document.getElementById('labelsContainer');
+            container.innerHTML = '';
+            
+            // Debug log
+            console.log('Displaying labels:', labels);
+            console.log('Labels type:', typeof labels);
+            console.log('Is array?', Array.isArray(labels));
+            
+            // Ensure labels is an array
+            if (!Array.isArray(labels)) {
+                console.error('Labels is not an array:', labels);
+                container.innerHTML = '<div class="col-12 text-center"><p class="text-muted">Error: Invalid data format</p></div>';
+                return;
+            }
+            
+            if (labels.length === 0) {
+                container.innerHTML = '<div class="col-12 text-center"><p class="text-muted">No labels found</p></div>';
+                return;
+            }
+            
+            labels.forEach(label => {
+                if (!label) return; // Skip null or undefined labels
+                
+                const card = document.createElement('div');
+                card.className = 'col-md-4 mb-3';
+                card.innerHTML = `
+                    <div class="card label-card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">${label}</h5>
+                                <div class="action-buttons">
+                                    <button class="btn btn-sm btn-outline-primary me-2" onclick="openRenameModal('${label}')">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteLabel('${label}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            // Update search info if provided
+            if (searchInfo) {
+                const searchInfoDiv = document.getElementById('searchInfo');
+                searchInfoDiv.style.display = 'block';
+                let infoText = `Found ${labels.length} labels`;
+                if (searchInfo.total_labels) {
+                    infoText += ` out of ${searchInfo.total_labels} total labels`;
+                }
+                if (searchInfo.cache_updated) {
+                    const updateTime = new Date(searchInfo.cache_updated);
+                    infoText += ` (Cache updated: ${updateTime.toLocaleTimeString()})`;
+                }
+                searchInfoDiv.querySelector('small').textContent = infoText;
+            }
+        }
+
+        // Function to search labels with debouncing
+        let searchTimeout;
+        let isSearching = false;
+
+        async function searchLabels(searchText) {
+            if (isSearching) return; // Prevent multiple simultaneous searches
+            
+            isSearching = true;
+            showLoading();
+            document.getElementById('searchStatus').style.display = 'block';
+            document.getElementById('searchInfo').style.display = 'none';
+            
+            try {
+                console.log('Searching for:', searchText);
+                const response = await fetch(`/api/labels?search=${encodeURIComponent(searchText)}`);
+                console.log('Response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Search response:', data);
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch labels');
+                }
+                
+                // Ensure we have the correct data structure
+                if (!data || !Array.isArray(data.labels)) {
+                    console.error('Invalid response format:', data);
+                    throw new Error('Invalid response format from server');
+                }
+                
+                displayLabels(data.labels, {
+                    total_labels: data.total_labels || 0,
+                    cache_updated: data.cache_updated
+                });
+            } catch (error) {
+                console.error('Search error:', error);
+                showError(error.message);
+                displayLabels([]); // Clear the display on error
+            } finally {
+                hideLoading();
+                document.getElementById('searchStatus').style.display = 'none';
+                isSearching = false;
+            }
+        }
+
+        // Add event listeners for search with improved debouncing
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchText = e.target.value.trim();
+            clearTimeout(searchTimeout);
+            
+            if (searchText.length < 2) {
+                displayLabels([]);
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => {
+                searchLabels(searchText);
+            }, 500); // Increased debounce time to 500ms
+        });
+
+        document.getElementById('searchButton').addEventListener('click', () => {
+            const searchText = document.getElementById('searchInput').value.trim();
+            if (searchText.length >= 2) {
+                searchLabels(searchText);
+            }
+        });
+
+        // Add new label
+        document.getElementById('saveNewLabel').addEventListener('click', async () => {
+            const label = document.getElementById('newLabel').value.trim();
+            if (!label) {
+                showError('Please enter a label name');
+                return;
+            }
+
+            showLoading();
+            try {
+                const response = await fetch('/api/labels', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ label })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to add label');
+                }
+
+                if (data.exists) {
+                    showError(`Label "${label}" already exists`);
+                } else {
+                    showSuccess(`Label "${label}" added successfully`);
+                    document.getElementById('newLabel').value = '';
+                    bootstrap.Modal.getInstance(document.getElementById('addLabelModal')).hide();
+                }
+
+                // Refresh search results if there's a search term
+                const searchText = document.getElementById('searchInput').value.trim();
+                if (searchText.length >= 2) {
+                    searchLabels(searchText);
+                } else {
+                    // If no search, refresh all labels
+                    const response = await fetch('/api/labels');
+                    const data = await response.json();
+                    if (response.ok && Array.isArray(data.labels)) {
+                        displayLabels(data.labels, {
+                            total_labels: data.total_labels || 0,
+                            cache_updated: data.cache_updated
+                        });
+                    }
+                }
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Delete label
+        async function deleteLabel(label) {
+            if (!confirm(`Are you sure you want to delete the label "${label}"?`)) return;
+            
+            showLoading();
+            try {
+                const response = await fetch(`/api/labels/${encodeURIComponent(label)}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to delete label');
+                }
+
+                const result = await response.json();
+                showSuccess(result.message);
+                // Refresh search results if there's a search term
+                const searchText = document.getElementById('searchInput').value.trim();
+                if (searchText.length >= 2) {
+                    searchLabels(searchText);
+                }
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Rename label
+        const renameModal = new bootstrap.Modal(document.getElementById('renameModal'));
+        
+        function openRenameModal(label) {
+            document.getElementById('oldLabel').value = label;
+            document.getElementById('newLabelName').value = label;
+            renameModal.show();
+        }
+
+        document.getElementById('saveRename').addEventListener('click', async () => {
+            const oldLabel = document.getElementById('oldLabel').value;
+            const newLabel = document.getElementById('newLabelName').value;
+            
+            if (!newLabel) return;
+
+            showLoading();
+            try {
+                const response = await fetch(`/api/labels/${encodeURIComponent(oldLabel)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ new_label: newLabel })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to rename label');
+                }
+
+                const result = await response.json();
+                showSuccess(result.message);
+                renameModal.hide();
+                // Refresh search results if there's a search term
+                const searchText = document.getElementById('searchInput').value.trim();
+                if (searchText.length >= 2) {
+                    searchLabels(searchText);
+                }
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Function to refresh labels
+        async function refreshLabels() {
+            showLoading();
+            try {
+                console.log('Refreshing labels...');
+                const response = await fetch('/api/labels/refresh', {
+                    method: 'POST'
+                });
+                console.log('Refresh response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Refresh response:', data);
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to refresh labels');
+                }
+
+                showSuccess(data.message);
+                
+                // Refresh the current view
+                const searchText = document.getElementById('searchInput').value.trim();
+                if (searchText.length >= 2) {
+                    searchLabels(searchText);
+                } else {
+                    // If no search, show all labels
+                    const response = await fetch('/api/labels');
+                    const data = await response.json();
+                    console.log('All labels response:', data);
+                    
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to fetch labels');
+                    }
+                    
+                    if (!data || !Array.isArray(data.labels)) {
+                        throw new Error('Invalid response format from server');
+                    }
+                    
+                    displayLabels(data.labels, {
+                        total_labels: data.total_labels || 0,
+                        cache_updated: data.cache_updated
+                    });
+                }
+            } catch (error) {
+                console.error('Refresh error:', error);
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Add event listener for refresh button
+        document.getElementById('refreshLabels').addEventListener('click', refreshLabels);
+
+        // Initial load of all labels
+        window.addEventListener('load', async () => {
+            try {
+                console.log('Loading initial labels...');
+                const response = await fetch('/api/labels');
+                console.log('Initial response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Initial response:', data);
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch labels');
+                }
+                
+                if (!data || !Array.isArray(data.labels)) {
+                    throw new Error('Invalid response format from server');
+                }
+                
+                displayLabels(data.labels, {
+                    total_labels: data.total_labels || 0,
+                    cache_updated: data.cache_updated
+                });
+            } catch (error) {
+                console.error('Initial load error:', error);
+                showError(error.message);
+                displayLabels([]); // Clear the display on error
+            }
+        });
+
+        // Sidebar navigation logic
+        document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelectorAll('.sidebar .nav-link').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+                const text = this.textContent.trim();
+                if (text === 'Sprint Report') {
+                    document.getElementById('labelManagerSection').style.display = 'none';
+                    document.getElementById('sprintReportSection').style.display = 'block';
+                    document.getElementById('mainTitle').textContent = 'Sprint Report';
+                    populateSprintBoards();
+                } else if (text === 'Label Manager') {
+                    document.getElementById('labelManagerSection').style.display = 'block';
+                    document.getElementById('sprintReportSection').style.display = 'none';
+                    document.getElementById('mainTitle').textContent = 'Label Manager';
+                } else {
+                    // For other menu items, you can add logic here
+                }
+            });
+        });
+
+        // Sprint Report UI logic
+        const sprintBoardSelect = document.getElementById('sprintBoardSelect');
+        const generateSprintReportBtn = document.getElementById('generateSprintReportBtn');
+        const downloadSprintReportCsvBtn = document.getElementById('downloadSprintReportCsvBtn');
+        const sprintReportLoading = document.getElementById('sprintReportLoading');
+        const sprintReportError = document.getElementById('sprintReportError');
+        const sprintReportTableWrapper = document.getElementById('sprintReportTableWrapper');
+        const sprintReportTableHead = document.getElementById('sprintReportTableHead');
+        const sprintReportTableBody = document.getElementById('sprintReportTableBody');
+
+        async function populateSprintBoards() {
+            sprintBoardSelect.innerHTML = '<option value="">Loading boards...</option>';
+            sprintBoardSelect.disabled = true;
+            try {
+                const res = await fetch('/api/jira/all_boards');
+                const data = await res.json();
+                if (data.boards && data.boards.length > 0) {
+                    sprintBoardSelect.innerHTML = '<option value="">Select a board</option>' +
+                        data.boards.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+                    sprintBoardSelect.disabled = false;
+                } else {
+                    sprintBoardSelect.innerHTML = '<option value="">No boards found</option>';
+                }
+            } catch (err) {
+                sprintBoardSelect.innerHTML = '<option value="">Error loading boards</option>';
+            }
+        }
+
+        sprintBoardSelect.addEventListener('change', function() {
+            generateSprintReportBtn.disabled = !this.value;
+            downloadSprintReportCsvBtn.disabled = true;
+            sprintReportTableWrapper.style.display = 'none';
+            sprintReportError.style.display = 'none';
+        });
+
+        generateSprintReportBtn.addEventListener('click', async function() {
+            const boardId = sprintBoardSelect.value;
+            if (!boardId) return;
+            sprintReportLoading.style.display = '';
+            sprintReportError.style.display = 'none';
+            sprintReportTableWrapper.style.display = 'none';
+            downloadSprintReportCsvBtn.disabled = true;
+            try {
+                const res = await fetch(`/api/jira_sprint_report?board_id=${boardId}`);
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                renderSprintReportTable(data.report);
+                downloadSprintReportCsvBtn.disabled = false;
+            } catch (err) {
+                sprintReportError.textContent = err.message || 'Failed to load sprint report.';
+                sprintReportError.style.display = '';
+            } finally {
+                sprintReportLoading.style.display = 'none';
+            }
+        });
+
+        downloadSprintReportCsvBtn.addEventListener('click', function() {
+            const boardId = sprintBoardSelect.value;
+            if (!boardId) return;
+            window.location = `/api/jira_sprint_report?board_id=${boardId}&format=csv`;
+        });
+
+        function renderSprintReportTable(report) {
+            if (!Array.isArray(report) || !report.length) {
+                sprintReportTableBody.innerHTML = '<tr><td colspan="10" class="text-center">No data available.</td></tr>';
+                sprintReportTableHead.innerHTML = '';
+                sprintReportTableWrapper.style.display = '';
+                return;
+            }
+            // Define the desired column order
+            const headers = [
+                "Sprint Name",
+                "Start Date",
+                "End Date",
+                "Completed",
+                "Not Completed",
+                "Added During Sprint",
+                "Removed During Sprint",
+                "Completion %",
+                "Insight",
+                "Status"
+            ];
+            sprintReportTableHead.innerHTML = headers.map(h => `<th>${h}</th>`).join('');
+            sprintReportTableBody.innerHTML = report.map(row =>
+                `<tr>${headers.map(h => `<td>${row[h]}</td>`).join('')}</tr>`
+            ).join('');
+            sprintReportTableWrapper.style.display = '';
+        }
+    </script>
+</body>
+</html> 
