@@ -29,7 +29,7 @@ def get_sprints_for_board(board_id):
     try:
         url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint"
         params = {
-            "maxResults": 50  # Get more sprints to ensure we have enough
+            "maxResults": 5  # Get more sprints to ensure we have enough
         }
         print(f"\nFetching sprints for board {board_id}")
         resp = requests.get(url, headers=headers, auth=auth, params=params)
@@ -268,6 +268,7 @@ def generate_jira_sprint_report(board_id):
             if result:
                 report.append(result)
                 
+        print("DEBUG: About to return report to frontend:", report)
         return report
     except Exception as e:
         print(f"Error generating sprint report: {str(e)}")

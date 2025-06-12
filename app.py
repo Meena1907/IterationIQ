@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, render_template, Response
 from flask_cors import CORS
-from scripts.jira_sprint_report import generate_jira_sprint_report
+from scripts.jira_sprint_report import generate_jira_sprint_report, analyze_sprint
 import requests
 import os
 import base64
@@ -774,51 +774,57 @@ def get_sprints_for_board():
         if not board_id:
             return jsonify({'error': 'Missing board_id parameter'}), 400
 
-        # Get date range parameters (optional)
-        days_ago = request.args.get('days_ago', '60')  # Default to 60 days
-        try:
-            days_ago = int(days_ago)
-        except ValueError:
-            return jsonify({'error': 'days_ago must be a number'}), 400
-
-        # Calculate the cutoff date
-        cutoff_date = datetime.now() - timedelta(days=days_ago)
-        
-        sprints = []
+        # Step 1: Get ALL sprints from the board
+        all_sprints = []
         start_at = 0
         max_results = 50
+        
         while True:
-            sprints_url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}&state=active,closed"
+            sprints_url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}"
             response = make_jira_request(sprints_url)
             if not response or response.status_code != 200:
                 return jsonify({'error': 'Failed to fetch sprints from Jira'}), 500
             data = response.json()
             
-            # Process each sprint
-            for sprint in data.get('values', []):
-                # Only include sprints that have an endDate
-                if sprint.get('endDate'):
-                    end_date = datetime.strptime(sprint['endDate'].split('T')[0], '%Y-%m-%d')
-                    # For board 1688, only include sprints with "CoreServices" in the name
-                    if board_id == '1688' and 'CoreServices' not in sprint.get('name', ''):
-                        continue
-                    # Only include sprints that ended after the cutoff date
-                    if end_date >= cutoff_date:
-                        sprints.append({
-                            'id': sprint['id'],
-                            'name': sprint['name'],
-                            'state': sprint['state'],
-                            'endDate': sprint['endDate']
-                        })
-            
+            all_sprints.extend(data.get('values', []))
+                        
             if data.get('isLast', True) or len(data.get('values', [])) == 0:
                 break
             start_at += max_results
 
-        # Sort sprints by endDate in descending order (most recent first)
-        sprints.sort(key=lambda x: x['endDate'], reverse=True)
+        print(f"Total sprints fetched: {len(all_sprints)}")
         
-        return jsonify({'sprints': sprints})
+        # Step 2: Filter for CLOSED sprints only and sort by endDate
+        closed_sprints = []
+        for sprint in all_sprints:
+            if sprint.get('state') == 'closed' and sprint.get('endDate'):
+                closed_sprints.append(sprint)
+        
+        print(f"Total closed sprints: {len(closed_sprints)}")
+        
+        # Sort by endDate (most recent first)
+        closed_sprints.sort(key=lambda x: x.get('endDate', ''), reverse=True)
+        
+        # Step 3: Take the top 5 most recent closed sprints
+        top_5_closed_sprints = closed_sprints[:5]
+        
+        print("Top 5 most recent CLOSED sprints:")
+        for i, sprint in enumerate(top_5_closed_sprints):
+            print(f"{i+1}. {sprint.get('name')} - End: {sprint.get('endDate')} - State: {sprint.get('state')}")
+        
+        # Step 4: Return the sprint info for the frontend
+        result_sprints = []
+        for sprint in top_5_closed_sprints:
+            result_sprints.append({
+                'id': sprint['id'],
+                'name': sprint['name'],
+                'state': sprint['state'],
+                'startDate': sprint.get('startDate'),
+                'endDate': sprint.get('endDate')
+            })
+        
+        return jsonify({'sprints': result_sprints})
+        
     except Exception as e:
         logger.error(f"Error fetching sprints for board: {str(e)}")
         logger.error(f"Traceback: {traceback.format_exc()}")
@@ -960,11 +966,11 @@ def get_all_boards():
         if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
             return jsonify({'error': 'Missing Jira credentials'}), 500
         
-        # List of known SCAL board IDs
-        scal_board_ids = ['2436', '1707', '1654', '1688', '1682']
+        # List of specific board IDs you want to fetch
+        board_ids = ['1707']  # Add your specific board IDs here
         boards = []
         
-        for board_id in scal_board_ids:
+        for board_id in board_ids:
             board_url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}"
             response = make_jira_request(board_url)
             if response and response.status_code == 200:
@@ -974,7 +980,10 @@ def get_all_boards():
                     'name': board_data['name']
                 })
             else:
-                logger.warning(f"Failed to fetch board {board_id}")
+                logger.warning(f"Failed to fetch board {board_id}: status={response.status_code if response else 'No response'}, text={response.text if response else 'No response'}")
+        
+        print("Successfully fetched boards:", [b['id'] for b in boards])
+        print("Failed board IDs:", [bid for bid in board_ids if bid not in [b['id'] for b in boards]])
         
         return jsonify({'boards': boards})
     except Exception as e:
@@ -1148,11 +1157,11 @@ def process_sprint_trends(task_id, board_id):
             start_at += max_results
         sprints = [s for s in sprints if s.get('endDate')]
         sprints.sort(key=lambda x: x.get('endDate', ''), reverse=True)
-        sprints = sprints[:5]
-        logger.debug(f"Processing {len(sprints)} sprints for board {board_id}")
+        sprints_to_add = sprints[:5]
+        logger.debug(f"Processing {len(sprints_to_add)} sprints for board {board_id}")
         sprint_details = []
         total_issues = 0
-        for sprint in sprints:
+        for sprint in sprints_to_add:
             sprint_id = sprint['id']
             sprint_name = sprint['name']
             sprint_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}"
@@ -1272,17 +1281,81 @@ def process_sprint_trends(task_id, board_id):
 def api_jira_sprint_report():
     board_id = request.args.get('board_id', '').strip()
     fmt = request.args.get('format', 'json').lower()
+    days_ago = request.args.get('days_ago', None)
+    name_contains = request.args.get('name_contains', None)
     if not board_id:
         return jsonify({'error': 'Missing board_id parameter'}), 400
     try:
-        report = generate_jira_sprint_report(board_id)
+        # Step 1: Get the 5 most recent CLOSED sprints for this board
+        print(f"Fetching most recent CLOSED sprints for board {board_id}")
+        
+        # Get ALL sprints from the board
+        all_sprints = []
+        start_at = 0
+        max_results = 50
+        
+        while True:
+            sprints_url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}"
+            response = make_jira_request(sprints_url)
+            if not response or response.status_code != 200:
+                return jsonify({'error': 'Failed to fetch sprints from Jira'}), 500
+            data = response.json()
+            
+            all_sprints.extend(data.get('values', []))
+                        
+            if data.get('isLast', True) or len(data.get('values', [])) == 0:
+                break
+            start_at += max_results
+
+        print(f"Total sprints fetched: {len(all_sprints)}")
+        
+        # Filter for CLOSED sprints only and sort by endDate
+        closed_sprints = []
+        for sprint in all_sprints:
+            if sprint.get('state') == 'closed' and sprint.get('endDate'):
+                closed_sprints.append(sprint)
+        
+        print(f"Total closed sprints: {len(closed_sprints)}")
+        
+        # Sort by endDate (most recent first)
+        closed_sprints.sort(key=lambda x: x.get('endDate', ''), reverse=True)
+        
+        # Take the top 5 most recent closed sprints
+        top_5_closed_sprints = closed_sprints[:5]
+        
+        print("Top 5 most recent CLOSED sprints for report:")
+        for i, sprint in enumerate(top_5_closed_sprints):
+            print(f"{i+1}. {sprint.get('name')} - End: {sprint.get('endDate')} - State: {sprint.get('state')}")
+        
+        # Step 2: Generate reports for these 5 closed sprints
+        report = []
+        for sprint in top_5_closed_sprints:
+            print(f"Generating report for sprint: {sprint.get('name')}")
+            result = analyze_sprint(sprint)
+            if result:
+                report.append(result)
+        
+        print(f"Generated reports for {len(report)} sprints")
+        
+        # Apply any additional filtering if requested
+        filtered_report = report
+        if days_ago is not None:
+            try:
+                days_ago = int(days_ago)
+                cutoff_date = datetime.now() - timedelta(days=days_ago)
+                filtered_report = [r for r in filtered_report if r.get('End Date') and datetime.strptime(r['End Date'].split('T')[0], '%Y-%m-%d') >= cutoff_date]
+            except Exception:
+                pass
+        if name_contains:
+            filtered_report = [r for r in filtered_report if name_contains.lower() in (r.get('Sprint Name', '').lower())]
+        
         if fmt == 'csv':
             # Convert report to CSV
             output = io.StringIO()
-            if report:
-                writer = csv.DictWriter(output, fieldnames=report[0].keys())
+            if filtered_report:
+                writer = csv.DictWriter(output, fieldnames=filtered_report[0].keys())
                 writer.writeheader()
-                writer.writerows(report)
+                writer.writerows(filtered_report)
             else:
                 output.write('No data')
             output.seek(0)
@@ -1294,7 +1367,7 @@ def api_jira_sprint_report():
                 }
             )
         else:
-            return jsonify({'report': report})
+            return jsonify({'report': filtered_report})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
