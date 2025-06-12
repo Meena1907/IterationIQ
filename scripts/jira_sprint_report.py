@@ -125,7 +125,7 @@ def generate_insight(completed, not_completed, scope_change, total_planned):
         
     return " | ".join(insights)
 
-def analyze_sprint(sprint):
+def analyze_sprint(sprint, board_id=None):
     try:
         if not sprint:
             print("Invalid sprint data")
@@ -146,86 +146,103 @@ def analyze_sprint(sprint):
         print(f"Start: {start_date}")
         print(f"End: {end_date}")
         
-        # Get all issues in the sprint
-        issues_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=100"
-        issues_resp = requests.get(issues_url, headers=headers, auth=auth)
-        issues_resp.raise_for_status()
-        issues_data = issues_resp.json()
-        issues = issues_data.get("issues", [])
-        
-        print(f"Found {len(issues)} issues in sprint")
-        
-        if not issues:
-            print(f"No issues found for sprint {sprint_name}")
-        
-        completed_count = 0
-        not_completed_count = 0
-        added_during_sprint = 0
-        removed_during_sprint = 0
-        
-        sprint_start_dt = parser.parse(start_date) if start_date != "N/A" else None
-        sprint_end_dt = parser.parse(end_date) if end_date != "N/A" else None
-        
-        for issue in issues:
-            try:
-                issue_key = issue.get("key")
-                if not issue_key:
-                    continue
-                    
-                # Get issue changelog
-                issue_url = f"{JIRA_URL}/rest/api/2/issue/{issue_key}?expand=changelog"
-                issue_resp = requests.get(issue_url, headers=headers, auth=auth)
-                issue_resp.raise_for_status()
-                issue_data = issue_resp.json()
-                changelog = issue_data.get("changelog", {}).get("histories", [])
+        # Get all issues in the sprint using the sprint report API (more accurate)
+        try:
+            # Try to get sprint report first (more accurate for closed sprints)
+            sprint_report_url = f"{JIRA_URL}/rest/greenhopper/1.0/rapid/charts/sprintreport"
+            params = {"rapidViewId": board_id or "2008", "sprintId": sprint_id}
+            sprint_report_resp = requests.get(sprint_report_url, headers=headers, auth=auth, params=params)
+            
+            if sprint_report_resp.status_code == 200:
+                sprint_report = sprint_report_resp.json()
                 
-                # Track sprint membership changes
-                was_added_during_sprint = False
-                was_removed_during_sprint = False
+                # Get completed and incomplete issues from sprint report
+                completed_issues = sprint_report.get("contents", {}).get("completedIssues", [])
+                incomplete_issues = sprint_report.get("contents", {}).get("incompletedIssues", [])
                 
-                for history in changelog:
-                    created = history.get("created")
-                    if not created:
-                        continue
-                    try:
-                        created_dt = parser.parse(created)
-                    except Exception:
-                        continue
-                    
-                    for item in history.get("items", []):
-                        if item.get("field") == "Sprint":
-                            # Check if issue was added to this sprint during the sprint
-                            if sprint_start_dt and created_dt > sprint_start_dt:
-                                if sprint.get("name") in item.get("toString", ""):
-                                    was_added_during_sprint = True
-                            # Check if issue was removed from this sprint during the sprint
-                            if sprint_end_dt and created_dt < sprint_end_dt:
-                                if sprint.get("name") in item.get("fromString", ""):
-                                    was_removed_during_sprint = True
+                # Get issues added/removed during sprint
+                added_issues = sprint_report.get("contents", {}).get("issuesNotCompletedInCurrentSprint", [])
+                removed_issues = sprint_report.get("contents", {}).get("puntedIssues", [])
                 
-                # Count completed/not completed based on status at sprint end
-                status = issue.get("fields", {}).get("status", {}).get("name", "").lower()
-                if status in ["done", "closed", "resolved"]:
-                    completed_count += 1
+                completed_count = len(completed_issues)
+                
+                # For "Not Completed", check the status of issues added during sprint
+                not_completed_count = 0
+                added_during_sprint = len(added_issues) if added_issues else 0
+                
+                # Check status of issues added during sprint
+                if added_issues:
+                    for issue in added_issues:
+                        issue_key = issue.get("key")
+                        if issue_key:
+                            try:
+                                # Get current status of the issue
+                                issue_url = f"{JIRA_URL}/rest/api/2/issue/{issue_key}"
+                                issue_resp = requests.get(issue_url, headers=headers, auth=auth)
+                                if issue_resp.status_code == 200:
+                                    issue_data = issue_resp.json()
+                                    status = issue_data.get("fields", {}).get("status", {}).get("name", "").lower()
+                                    if status not in ["done", "closed", "resolved"]:
+                                        not_completed_count += 1
+                            except Exception as e:
+                                print(f"Error checking status for issue {issue_key}: {str(e)}")
+                                # If we can't check status, assume not completed
+                                not_completed_count += 1
                 else:
-                    not_completed_count += 1
+                    # If no issues were added during sprint, use incomplete issues count
+                    not_completed_count = len(incomplete_issues)
+                
+                removed_during_sprint = len(removed_issues) if removed_issues else 0
+                
+                print(f"Using sprint report API:")
+                print(f"Completed: {completed_count}")
+                print(f"Not Completed (from added during sprint): {not_completed_count}")
+                print(f"Added during sprint: {added_during_sprint}")
+                print(f"Removed during sprint: {removed_during_sprint}")
+                
+            else:
+                raise Exception("Sprint report API failed, falling back to issue API")
+                
+        except Exception as e:
+            print(f"Sprint report API failed: {str(e)}, using fallback method")
+            
+            # Fallback: Get all issues in the sprint
+            issues_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=100"
+            issues_resp = requests.get(issues_url, headers=headers, auth=auth)
+            issues_resp.raise_for_status()
+            issues_data = issues_resp.json()
+            issues = issues_data.get("issues", [])
+            
+            print(f"Found {len(issues)} issues in sprint (fallback method)")
+            
+            completed_count = 0
+            not_completed_count = 0
+            added_during_sprint = 0
+            removed_during_sprint = 0
+            
+            sprint_start_dt = parser.parse(start_date) if start_date != "N/A" else None
+            sprint_end_dt = parser.parse(end_date) if end_date != "N/A" else None
+            
+            for issue in issues:
+                try:
+                    issue_key = issue.get("key")
+                    if not issue_key:
+                        continue
                     
-                if was_added_during_sprint:
-                    added_during_sprint += 1
-                if was_removed_during_sprint:
-                    removed_during_sprint += 1
-            except Exception as e:
-                print(f"Error processing issue {issue.get('key', 'unknown')}: {str(e)}")
-                continue
+                    # For closed sprints, use current status as approximation
+                    # (This is less accurate but better than nothing)
+                    status = issue.get("fields", {}).get("status", {}).get("name", "").lower()
+                    if status in ["done", "closed", "resolved"]:
+                        completed_count += 1
+                    else:
+                        not_completed_count += 1
+                        
+                except Exception as e:
+                    print(f"Error processing issue {issue.get('key', 'unknown')}: {str(e)}")
+                    continue
         
         total_planned = completed_count + not_completed_count
         completion_pct = f"{(completed_count / total_planned * 100):.1f}%" if total_planned > 0 else "N/A"
-        
-        print(f"Completed: {completed_count}")
-        print(f"Not Completed: {not_completed_count}")
-        print(f"Added during sprint: {added_during_sprint}")
-        print(f"Removed during sprint: {removed_during_sprint}")
-        print(f"Completion %: {completion_pct}")
         
         # Generate insights
         insight = generate_insight(
@@ -264,7 +281,7 @@ def generate_jira_sprint_report(board_id):
             return []
             
         for sprint in sprints:
-            result = analyze_sprint(sprint)
+            result = analyze_sprint(sprint, board_id)
             if result:
                 report.append(result)
                 

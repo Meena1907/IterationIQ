@@ -1331,7 +1331,7 @@ def api_jira_sprint_report():
         report = []
         for sprint in top_5_closed_sprints:
             print(f"Generating report for sprint: {sprint.get('name')}")
-            result = analyze_sprint(sprint)
+            result = analyze_sprint(sprint, board_id)
             if result:
                 report.append(result)
         

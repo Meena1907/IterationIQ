@@ -6,6 +6,7 @@
     <title>Jira Label Manager</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* Sidebar styles */
         .sidebar {
@@ -126,24 +127,6 @@
                         Sprint Report
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#">
-                        <i class="fas fa-tasks"></i>
-                        Tasks
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#">
-                        <i class="fas fa-chart-bar"></i>
-                        Reports
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#">
-                        <i class="fas fa-cog"></i>
-                        Settings
-                    </a>
-                </li>
             </ul>
         </div>
     </nav>
@@ -183,13 +166,52 @@
                         </div>
                         <div id="sprintReportError" class="alert alert-danger" style="display:none;"></div>
                         <div id="sprintReportTableWrapper" style="display:none;">
-                            <h5 class="mb-3">Last 4 Closed Sprints</h5>
+                            <h5 class="mb-3">Last 5 Closed Sprints</h5>
                             <table class="table table-bordered table-hover">
                                 <thead>
                                     <tr id="sprintReportTableHead"></tr>
                                 </thead>
                                 <tbody id="sprintReportTableBody"></tbody>
                             </table>
+                            
+                            <!-- Sprint Charts Section -->
+                            <div class="mt-5">
+                                <h5 class="mb-3">Sprint Analytics</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0">Completion Rate Trend</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <canvas id="completionTrendChart" width="400" height="200"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0">Sprint Scope Changes</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <canvas id="scopeChangesChart" width="400" height="200"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0">Sprint Velocity Overview</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <canvas id="velocityChart" width="800" height="300"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -774,6 +796,131 @@
                 `<tr>${headers.map(h => `<td>${row[h]}</td>`).join('')}</tr>`
             ).join('');
             sprintReportTableWrapper.style.display = '';
+            
+            // Render charts after table is displayed
+            renderSprintCharts(report);
+        }
+
+        function renderSprintCharts(report) {
+            // Prepare data for charts
+            const sprintNames = report.map(r => r["Sprint Name"].substring(0, 15) + "..."); // Truncate long names
+            const completionRates = report.map(r => parseFloat(r["Completion %"].replace('%', '')));
+            const completed = report.map(r => r["Completed"]);
+            const notCompleted = report.map(r => r["Not Completed"]);
+            const addedDuring = report.map(r => r["Added During Sprint"]);
+            const removedDuring = report.map(r => r["Removed During Sprint"]);
+
+            // Chart 1: Completion Rate Trend
+            const ctx1 = document.getElementById('completionTrendChart').getContext('2d');
+            new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: sprintNames,
+                    datasets: [{
+                        label: 'Completion Rate (%)',
+                        data: completionRates,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Chart 2: Sprint Scope Changes
+            const ctx2 = document.getElementById('scopeChangesChart').getContext('2d');
+            new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: sprintNames,
+                    datasets: [{
+                        label: 'Added During Sprint',
+                        data: addedDuring,
+                        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'Removed During Sprint',
+                        data: removedDuring,
+                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Chart 3: Sprint Velocity Overview
+            const ctx3 = document.getElementById('velocityChart').getContext('2d');
+            new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: sprintNames,
+                    datasets: [{
+                        label: 'Completed',
+                        data: completed,
+                        backgroundColor: 'rgba(75, 192, 192, 0.8)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'Not Completed',
+                        data: notCompleted,
+                        backgroundColor: 'rgba(255, 206, 86, 0.8)',
+                        borderColor: 'rgba(255, 206, 86, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(context) {
+                                    const dataIndex = context.dataIndex;
+                                    const total = completed[dataIndex] + notCompleted[dataIndex];
+                                    const percentage = total > 0 ? ((context.parsed.y / total) * 100).toFixed(1) : 0;
+                                    return `${percentage}% of total`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         }
     </script>
 </body>
