@@ -149,10 +149,23 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label for="sprintBoardSelect" class="form-label">Select Board</label>
-                            <select id="sprintBoardSelect" class="form-select">
-                                <option value="">Loading boards...</option>
-                            </select>
+                            <label for="sprintBoardInput" class="form-label">Jira Board URL or Board ID</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="sprintBoardInput" 
+                                       placeholder="Enter Jira board URL (e.g., https://thoughtspot.atlassian.net/jira/software/c/projects/SCAL/boards/2008) or Board ID (e.g., 2008)">
+                                <button class="btn btn-outline-secondary" type="button" id="extractBoardIdBtn">
+                                    <i class="fas fa-search"></i> Extract
+                                </button>
+                            </div>
+                            <small class="form-text text-muted">
+                                You can paste the full Jira board URL or just enter the board ID number.
+                            </small>
+                            <div id="extractedBoardInfo" class="mt-2" style="display: none;">
+                                <div class="alert alert-success">
+                                    <i class="fas fa-check-circle"></i> 
+                                    <strong>Board ID extracted:</strong> <span id="extractedBoardId"></span>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <button class="btn btn-primary" id="generateSprintReportBtn" disabled>Generate Report</button>
@@ -698,7 +711,6 @@
                     document.getElementById('labelManagerSection').style.display = 'none';
                     document.getElementById('sprintReportSection').style.display = 'block';
                     document.getElementById('mainTitle').textContent = 'Sprint Report';
-                    populateSprintBoards();
                 } else if (text === 'Label Manager') {
                     document.getElementById('labelManagerSection').style.display = 'block';
                     document.getElementById('sprintReportSection').style.display = 'none';
@@ -710,7 +722,9 @@
         });
 
         // Sprint Report UI logic
-        const sprintBoardSelect = document.getElementById('sprintBoardSelect');
+        const sprintBoardInput = document.getElementById('sprintBoardInput');
+        const extractBoardIdBtn = document.getElementById('extractBoardIdBtn');
+        const extractedBoardInfo = document.getElementById('extractedBoardInfo');
         const generateSprintReportBtn = document.getElementById('generateSprintReportBtn');
         const downloadSprintReportCsvBtn = document.getElementById('downloadSprintReportCsvBtn');
         const sprintReportLoading = document.getElementById('sprintReportLoading');
@@ -719,56 +733,93 @@
         const sprintReportTableHead = document.getElementById('sprintReportTableHead');
         const sprintReportTableBody = document.getElementById('sprintReportTableBody');
 
-        async function populateSprintBoards() {
-            sprintBoardSelect.innerHTML = '<option value="">Loading boards...</option>';
-            sprintBoardSelect.disabled = true;
-            try {
-                const res = await fetch('/api/jira/all_boards');
-                const data = await res.json();
-                if (data.boards && data.boards.length > 0) {
-                    sprintBoardSelect.innerHTML = '<option value="">Select a board</option>' +
-                        data.boards.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-                    sprintBoardSelect.disabled = false;
-                } else {
-                    sprintBoardSelect.innerHTML = '<option value="">No boards found</option>';
+        let extractedBoardId = null;
+
+        function extractBoardIdFromUrl(input) {
+            // If it's already a number, return it
+            if (/^\d+$/.test(input.trim())) {
+                return input.trim();
+            }
+            
+            // Extract board ID from various Jira URL formats
+            const patterns = [
+                /\/boards\/(\d+)/,  // Standard board URL
+                /rapidView=(\d+)/,  // Legacy URL format
+                /board=(\d+)/,      // Alternative format
+                /boardId=(\d+)/     // Another alternative
+            ];
+            
+            for (const pattern of patterns) {
+                const match = input.match(pattern);
+                if (match) {
+                    return match[1];
                 }
-            } catch (err) {
-                sprintBoardSelect.innerHTML = '<option value="">Error loading boards</option>';
+            }
+            
+            return null;
+        }
+
+        function handleBoardIdExtraction() {
+            const input = sprintBoardInput.value.trim();
+            if (!input) {
+                alert('Please enter a Jira board URL or board ID');
+                return;
+            }
+            
+            const boardId = extractBoardIdFromUrl(input);
+            if (boardId) {
+                extractedBoardId = boardId;
+                document.getElementById('extractedBoardId').textContent = boardId;
+                extractedBoardInfo.style.display = 'block';
+                generateSprintReportBtn.disabled = false;
+                sprintReportError.style.display = 'none';
+            } else {
+                extractedBoardInfo.style.display = 'none';
+                generateSprintReportBtn.disabled = true;
+                sprintReportError.textContent = 'Could not extract board ID from the provided input. Please check the URL format or enter a valid board ID.';
+                sprintReportError.style.display = 'block';
             }
         }
 
-        sprintBoardSelect.addEventListener('change', function() {
-            generateSprintReportBtn.disabled = !this.value;
-            downloadSprintReportCsvBtn.disabled = true;
-            sprintReportTableWrapper.style.display = 'none';
-            sprintReportError.style.display = 'none';
+        extractBoardIdBtn.addEventListener('click', handleBoardIdExtraction);
+        
+        sprintBoardInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleBoardIdExtraction();
+            }
         });
 
         generateSprintReportBtn.addEventListener('click', async function() {
-            const boardId = sprintBoardSelect.value;
-            if (!boardId) return;
-            sprintReportLoading.style.display = '';
+            if (!extractedBoardId) {
+                alert('Please extract a board ID first');
+                return;
+            }
+            
+            sprintReportLoading.style.display = 'block';
             sprintReportError.style.display = 'none';
             sprintReportTableWrapper.style.display = 'none';
             downloadSprintReportCsvBtn.disabled = true;
+            
             try {
-                const res = await fetch(`/api/jira_sprint_report?board_id=${boardId}`);
+                const res = await fetch(`/api/jira_sprint_report?board_id=${extractedBoardId}`);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
                 renderSprintReportTable(data.report);
                 downloadSprintReportCsvBtn.disabled = false;
             } catch (err) {
                 sprintReportError.textContent = err.message || 'Failed to load sprint report.';
-                sprintReportError.style.display = '';
+                sprintReportError.style.display = 'block';
             } finally {
                 sprintReportLoading.style.display = 'none';
             }
         });
 
         downloadSprintReportCsvBtn.addEventListener('click', function() {
-            const boardId = sprintBoardSelect.value;
-            if (!boardId) return;
-            window.location = `/api/jira_sprint_report?board_id=${boardId}&format=csv`;
+            if (!extractedBoardId) {
+                alert('Please extract a board ID first');
+                return;
+            }
+            window.location = `/api/jira_sprint_report?board_id=${extractedBoardId}&format=csv`;
         });
 
         function renderSprintReportTable(report) {
@@ -801,7 +852,26 @@
             renderSprintCharts(report);
         }
 
+        // Store chart instances to manage them
+        let completionTrendChartInstance = null;
+        let scopeChangesChartInstance = null;
+        let velocityChartInstance = null;
+
         function renderSprintCharts(report) {
+            // Destroy existing charts if they exist
+            if (completionTrendChartInstance) {
+                completionTrendChartInstance.destroy();
+                completionTrendChartInstance = null;
+            }
+            if (scopeChangesChartInstance) {
+                scopeChangesChartInstance.destroy();
+                scopeChangesChartInstance = null;
+            }
+            if (velocityChartInstance) {
+                velocityChartInstance.destroy();
+                velocityChartInstance = null;
+            }
+
             // Prepare data for charts
             const sprintNames = report.map(r => r["Sprint Name"].substring(0, 15) + "..."); // Truncate long names
             const completionRates = report.map(r => parseFloat(r["Completion %"].replace('%', '')));
@@ -812,7 +882,7 @@
 
             // Chart 1: Completion Rate Trend
             const ctx1 = document.getElementById('completionTrendChart').getContext('2d');
-            new Chart(ctx1, {
+            completionTrendChartInstance = new Chart(ctx1, {
                 type: 'line',
                 data: {
                     labels: sprintNames,
@@ -848,7 +918,7 @@
 
             // Chart 2: Sprint Scope Changes
             const ctx2 = document.getElementById('scopeChangesChart').getContext('2d');
-            new Chart(ctx2, {
+            scopeChangesChartInstance = new Chart(ctx2, {
                 type: 'bar',
                 data: {
                     labels: sprintNames,
@@ -878,7 +948,7 @@
 
             // Chart 3: Sprint Velocity Overview
             const ctx3 = document.getElementById('velocityChart').getContext('2d');
-            new Chart(ctx3, {
+            velocityChartInstance = new Chart(ctx3, {
                 type: 'bar',
                 data: {
                     labels: sprintNames,
