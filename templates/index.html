@@ -8,111 +8,467 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Sidebar styles */
+        /* Modern Teal & Deep Blue color palette */
+        :root {
+            --primary-gradient: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+            --secondary-gradient: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+            --dark-gradient: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
+            --light-gradient: linear-gradient(135deg, #a7f3d0 0%, #ddd6fe 100%);
+            --sidebar-bg: linear-gradient(180deg, #1e3a8a 0%, #3730a3 100%);
+            --header-bg: linear-gradient(90deg, #06beb6 0%, #0891b2 100%);
+            --card-shadow: 0 10px 30px rgba(6, 190, 182, 0.15);
+            --hover-shadow: 0 15px 40px rgba(6, 190, 182, 0.25);
+            --accent-color: #06beb6;
+            --success-color: #0891b2;
+            --text-primary: #1f2937;
+            --text-secondary: #4b5563;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f0fdfa 0%, #e6fffa 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        /* Modern Sidebar styles */
         .sidebar {
             position: fixed;
             top: 0;
             bottom: 0;
             left: 0;
             z-index: 100;
-            padding: 48px 0 0;
-            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
-            background-color: #f8f9fa;
-            width: 250px;
+            padding: 0;
+            background: var(--sidebar-bg);
+            width: 280px;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .sidebar-header {
+            padding: 2rem 1.5rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .sidebar-logo {
+            color: #fff;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .sidebar-logo i {
+            font-size: 2rem;
+            background: var(--light-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .sidebar-sticky {
             position: relative;
             top: 0;
-            height: calc(100vh - 48px);
-            padding-top: .5rem;
+            height: calc(100vh - 120px);
+            padding: 1rem 0;
             overflow-x: hidden;
             overflow-y: auto;
         }
 
         .sidebar .nav-link {
             font-weight: 500;
-            color: #333;
-            padding: 0.5rem 1rem;
-            margin: 0.2rem 0;
-            border-radius: 0.25rem;
+            color: rgba(255, 255, 255, 0.8);
+            padding: 1rem 1.5rem;
+            margin: 0.3rem 1rem;
+            border-radius: 12px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar .nav-link::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .sidebar .nav-link:hover::before {
+            left: 100%;
         }
 
         .sidebar .nav-link:hover {
-            background-color: #e9ecef;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
         .sidebar .nav-link.active {
-            color: #2470dc;
-            background-color: #e9ecef;
+            color: #fff;
+            background: var(--secondary-gradient);
+            box-shadow: 0 8px 25px rgba(6, 190, 182, 0.3);
+            transform: translateX(5px);
         }
 
         .sidebar .nav-link i {
-            margin-right: 0.5rem;
-            color: #999;
+            margin-right: 1rem;
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
         }
 
-        .sidebar .nav-link.active i {
-            color: #2470dc;
+        /* Modern Header styles */
+        .modern-header {
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 280px;
+            height: 70px;
+            background: var(--header-bg);
+            z-index: 1030;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-title {
+            color: #fff;
+            font-size: 1.4rem;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
         /* Main content styles */
         .main-content {
-            margin-left: 250px;
-            padding: 20px;
+            margin-left: 280px;
+            margin-top: 70px;
+            padding: 2rem;
+            min-height: calc(100vh - 70px);
         }
 
-        /* Existing styles */
-        .label-card {
+        .content-header {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .content-title {
+            font-size: 2rem;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0;
+        }
+
+        .header-title {
+            color: #fff;
+            font-size: 1.4rem;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Enhanced card styles */
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .card-header {
+            background: var(--primary-gradient);
+            color: #fff;
+            border-radius: 16px 16px 0 0 !important;
+            border: none;
+            padding: 1.25rem 1.5rem;
+        }
+
+        .card-header h5, .card-header h6 {
+            margin: 0;
+            font-weight: 600;
+            color: #fff !important;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Input group styling in card headers */
+        .card-header .input-group .form-control {
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 2px solid rgba(255, 255, 255, 0.8) !important;
+            color: var(--text-primary) !important;
+        }
+
+        .card-header .input-group .form-control:focus {
+            background: #fff !important;
+            border-color: rgba(255, 255, 255, 0.9) !important;
+            box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.3) !important;
+        }
+
+        /* Button enhancements */
+        .btn-primary {
+            background: var(--primary-gradient);
+            border: none;
+            border-radius: 10px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
             transition: all 0.3s ease;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
+            box-shadow: 0 4px 15px rgba(6, 190, 182, 0.3);
+            color: #fff;
         }
-        .label-card:hover {
+
+        .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 25px rgba(6, 190, 182, 0.4);
+            background: var(--secondary-gradient);
+            color: #fff;
         }
+
+
+
+        .btn-outline-success {
+            border-radius: 10px;
+            border: 2px solid var(--success-color);
+            color: var(--success-color);
+            transition: all 0.3s ease;
+        }
+
+        .btn-outline-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(8, 145, 178, 0.3);
+            background: var(--success-color);
+            border-color: var(--success-color);
+            color: #fff;
+        }
+
+        /* Form enhancements */
+        .form-control {
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+            padding: 0.75rem 1rem;
+            transition: all 0.3s ease;
+            background: #fff !important;
+            color: var(--text-primary) !important;
+            font-weight: 500;
+        }
+
+        .form-control:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 0.2rem rgba(6, 190, 182, 0.25);
+            background: #fff !important;
+        }
+
+        .form-control::placeholder {
+            color: #9ca3af !important;
+            font-weight: 400;
+        }
+
+        /* Enhanced button visibility */
+        .btn-outline-secondary {
+            border-radius: 10px;
+            border: 2px solid #fff !important;
+            color: #fff !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-outline-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.2) !important;
+            border-color: #fff !important;
+            color: #fff !important;
+        }
+
+        /* Special styling for buttons in card headers */
+        .card-header .btn-outline-secondary {
+            border: 2px solid rgba(255, 255, 255, 0.8) !important;
+            color: #fff !important;
+            background: rgba(255, 255, 255, 0.15) !important;
+        }
+
+        .card-header .btn-outline-secondary:hover {
+            background: rgba(255, 255, 255, 0.25) !important;
+            border-color: #fff !important;
+            color: #fff !important;
+        }
+
+        .card-header .btn-primary {
+            background: rgba(255, 255, 255, 0.2) !important;
+            border: 2px solid rgba(255, 255, 255, 0.8) !important;
+            color: #fff !important;
+            backdrop-filter: blur(10px);
+        }
+
+        .card-header .btn-primary:hover {
+            background: rgba(255, 255, 255, 0.3) !important;
+            border-color: #fff !important;
+            color: #fff !important;
+            transform: translateY(-2px);
+        }
+
+        /* Existing enhanced styles */
+        .label-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .label-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--hover-shadow);
+        }
+
         .action-buttons {
             opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: all 0.3s ease;
         }
+
         .label-card:hover .action-buttons {
             opacity: 1;
         }
+
         .loading-spinner {
             display: none;
             margin: 20px auto;
         }
+
         .error-message {
             display: none;
             margin: 20px auto;
             color: #dc3545;
         }
+
         .success-message {
             display: none;
             margin: 20px auto;
             color: #198754;
         }
 
-        /* Header styles */
-        .navbar {
-            position: fixed;
-            top: 0;
-            right: 0;
-            left: 250px;
-            z-index: 1030;
-            background-color: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+        /* Table enhancements */
+        .table {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
         }
 
-        .navbar-brand {
-            padding-left: 1rem;
+        .table thead th {
+            background: var(--primary-gradient);
+            color: #fff;
+            border: none;
+            font-weight: 600;
+            padding: 1rem;
+        }
+
+        .table tbody tr {
+            transition: all 0.3s ease;
+        }
+
+        .table tbody tr:hover {
+            background: rgba(6, 190, 182, 0.1);
+            transform: scale(1.01);
+        }
+
+        /* Alert enhancements */
+        .alert {
+            border-radius: 12px;
+            border: none;
+            backdrop-filter: blur(10px);
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, rgba(8, 145, 178, 0.1) 0%, rgba(8, 145, 178, 0.05) 100%);
+            color: #0c4a6e;
+            border-left: 4px solid var(--success-color);
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, rgba(220, 53, 69, 0.1) 0%, rgba(220, 53, 69, 0.05) 100%);
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary-gradient);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--secondary-gradient);
         }
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
+    <!-- Modern Sidebar -->
     <nav class="sidebar">
+        <div class="sidebar-header">
+            <a href="#" class="sidebar-logo">
+                <i class="fas fa-project-diagram"></i>
+                <span>Jira Hub</span>
+            </a>
+        </div>
         <div class="sidebar-sticky">
             <ul class="nav flex-column">
                 <li class="nav-item">
@@ -131,15 +487,24 @@
         </div>
     </nav>
 
-    <!-- Top right header -->
-    <header style="position: fixed; top: 0; right: 0; left: 250px; height: 56px; background: #fff; z-index: 1030; box-shadow: 0 2px 4px rgba(0,0,0,.05); display: flex; align-items: center; justify-content: flex-end; padding-right: 2rem;">
-        <span style="font-size: 1.15rem; font-weight: 600; color: #333;">Jira Management System</span>
+    <!-- Modern Header -->
+    <header class="modern-header">
+        <div class="header-title" id="mainTitle">Label Manager</div>
+        <div class="header-actions">
+            <a href="#" class="header-btn">
+                <i class="fas fa-cog"></i>
+                Settings
+            </a>
+            <a href="#" class="header-btn">
+                <i class="fas fa-user"></i>
+                Profile
+            </a>
+        </div>
     </header>
 
     <!-- Main content -->
-    <main class="main-content" style="margin-top: 56px;">
-        <div class="container-fluid py-4">
-            <h2 class="mb-4" id="mainTitle" style="font-size: 1.5rem; font-weight: 600; color: #222;">Label Manager</h2>
+    <main class="main-content">
+        <div class="container-fluid">
 
             <!-- Sprint Report Content (hidden by default) -->
             <div id="sprintReportSection" style="display: none;">
@@ -169,7 +534,9 @@
                         </div>
                         <div class="mb-3">
                             <button class="btn btn-primary" id="generateSprintReportBtn" disabled>Generate Report</button>
-                            <button class="btn btn-outline-success ms-2" id="downloadSprintReportCsvBtn" disabled>Download CSV</button>
+                            <button class="btn btn-outline-success ms-2" id="downloadSprintReportCsvBtn" disabled>
+                                <i class="fas fa-download"></i> Download CSV
+                            </button>
                         </div>
                         <div id="sprintReportLoading" class="my-4" style="display:none;">
                             <div class="d-flex align-items-center">
@@ -814,12 +1181,76 @@
             }
         });
 
-        downloadSprintReportCsvBtn.addEventListener('click', function() {
+        downloadSprintReportCsvBtn.addEventListener('click', async function() {
             if (!extractedBoardId) {
                 alert('Please extract a board ID first');
                 return;
             }
-            window.location = `/api/jira_sprint_report?board_id=${extractedBoardId}&format=csv`;
+            
+            // Store reference to button for proper state management
+            const button = this;
+            const originalHTML = button.innerHTML;
+            
+            try {
+                // Show loading state
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+                
+                // Create download URL
+                const downloadUrl = `/api/jira_sprint_report?board_id=${extractedBoardId}&format=csv`;
+                console.log('Downloading CSV from:', downloadUrl);
+                
+                // Use fetch to handle the download properly
+                const response = await fetch(downloadUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                // Get the CSV content
+                const csvContent = await response.text();
+                
+                // Create a blob and download link
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                
+                // Create temporary download link
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `sprint_report_board_${extractedBoardId}_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Add a small delay to ensure download starts
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                console.log('CSV download completed successfully');
+                
+                // Show success state briefly
+                button.innerHTML = '<i class="fas fa-check"></i> Downloaded!';
+                button.classList.add('btn-success');
+                button.classList.remove('btn-outline-success');
+                
+                // Restore original state after 2 seconds
+                setTimeout(() => {
+                    button.innerHTML = originalHTML;
+                    button.classList.remove('btn-success');
+                    button.classList.add('btn-outline-success');
+                    button.disabled = false;
+                }, 2000);
+                
+            } catch (error) {
+                console.error('CSV download failed:', error);
+                alert(`Failed to download CSV: ${error.message}`);
+                
+                // Restore button state immediately on error
+                button.disabled = false;
+                button.innerHTML = originalHTML;
+            }
         });
 
         function renderSprintReportTable(report) {
