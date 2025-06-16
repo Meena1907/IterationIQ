@@ -156,47 +156,41 @@ def analyze_sprint(sprint, board_id=None):
             if sprint_report_resp.status_code == 200:
                 sprint_report = sprint_report_resp.json()
                 
-                # Get completed and incomplete issues from sprint report
+                # Get the correct fields from Jira Sprint Report API
                 completed_issues = sprint_report.get("contents", {}).get("completedIssues", [])
                 incomplete_issues = sprint_report.get("contents", {}).get("incompletedIssues", [])
+                punted_issues = sprint_report.get("contents", {}).get("puntedIssues", [])
+                issues_not_completed_in_current_sprint = sprint_report.get("contents", {}).get("issuesNotCompletedInCurrentSprint", [])
+                issue_keys_added_during_sprint = sprint_report.get("contents", {}).get("issueKeysAddedDuringSprint", [])
                 
-                # Get issues added/removed during sprint
-                added_issues = sprint_report.get("contents", {}).get("issuesNotCompletedInCurrentSprint", [])
-                removed_issues = sprint_report.get("contents", {}).get("puntedIssues", [])
+                # Debug: Print what we actually got from the API
+                print(f"DEBUG - API Response fields:")
+                print(f"  completedIssues: {len(completed_issues)} items")
+                print(f"  incompletedIssues: {len(incomplete_issues)} items")
+                print(f"  puntedIssues: {len(punted_issues)} items")
+                print(f"  issuesNotCompletedInCurrentSprint: {len(issues_not_completed_in_current_sprint)} items")
+                print(f"  issueKeysAddedDuringSprint: {len(issue_keys_added_during_sprint)} items")
                 
+                # Correct calculations
                 completed_count = len(completed_issues)
-                
-                # For "Not Completed", check the status of issues added during sprint
-                not_completed_count = 0
-                added_during_sprint = len(added_issues) if added_issues else 0
-                
-                # Check status of issues added during sprint
-                if added_issues:
-                    for issue in added_issues:
-                        issue_key = issue.get("key")
-                        if issue_key:
-                            try:
-                                # Get current status of the issue
-                                issue_url = f"{JIRA_URL}/rest/api/2/issue/{issue_key}"
-                                issue_resp = requests.get(issue_url, headers=headers, auth=auth)
-                                if issue_resp.status_code == 200:
-                                    issue_data = issue_resp.json()
-                                    status = issue_data.get("fields", {}).get("status", {}).get("name", "").lower()
-                                    if status not in ["done", "closed", "resolved"]:
-                                        not_completed_count += 1
-                            except Exception as e:
-                                print(f"Error checking status for issue {issue_key}: {str(e)}")
-                                # If we can't check status, assume not completed
-                                not_completed_count += 1
+                # If incompletedIssues is empty, use issuesNotCompletedInCurrentSprint as fallback
+                if len(incomplete_issues) == 0 and len(issues_not_completed_in_current_sprint) > 0:
+                    not_completed_count = len(issues_not_completed_in_current_sprint)
+                    print(f"DEBUG - Using issuesNotCompletedInCurrentSprint for not_completed_count")
                 else:
-                    # If no issues were added during sprint, use incomplete issues count
                     not_completed_count = len(incomplete_issues)
+                    print(f"DEBUG - Using incompletedIssues for not_completed_count")
                 
-                removed_during_sprint = len(removed_issues) if removed_issues else 0
+                added_during_sprint = len(issue_keys_added_during_sprint)
+                removed_during_sprint = len(punted_issues)
+                
+                # Initial planned: issues present at sprint start
+                initial_planned = (completed_count + not_completed_count + removed_during_sprint) - added_during_sprint
                 
                 print(f"Using sprint report API:")
+                print(f"Initial Planned: {initial_planned}")
                 print(f"Completed: {completed_count}")
-                print(f"Not Completed (from added during sprint): {not_completed_count}")
+                print(f"Not Completed: {not_completed_count}")
                 print(f"Added during sprint: {added_during_sprint}")
                 print(f"Removed during sprint: {removed_during_sprint}")
                 
