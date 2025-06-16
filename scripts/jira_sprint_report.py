@@ -251,6 +251,7 @@ def analyze_sprint(sprint, board_id=None):
             "Start Date": start_date[:10] if start_date != "N/A" else "N/A",
             "End Date": end_date[:10] if end_date != "N/A" else "N/A",
             "Status": state,
+            "Initial Planned": initial_planned,
             "Completed": completed_count,
             "Not Completed": not_completed_count,
             "Added During Sprint": added_during_sprint,
@@ -290,7 +291,7 @@ if __name__ == "__main__":
     BOARD_ID = "1697"  # Default for CLI usage
     report = generate_jira_sprint_report(BOARD_ID)
     print("\nSprint Report Summary (Last 5 Sprints for Each Active Sprint):")
-    print(f"{'Sprint Name':<30} {'Start':<12} {'End':<12} {'Status':<10} {'Completed':<10} {'Not Completed':<15} {'Added':<10} {'Removed':<10} {'Completion %':<12} {'Insight':<40}")
+    print(f"{'Sprint Name':<30} {'Start':<12} {'End':<12} {'Status':<10} {'Initial Planned':<20} {'Completed':<10} {'Not Completed':<15} {'Added':<10} {'Removed':<10} {'Completion %':<12} {'Insight':<40}")
     print("-" * 170)
     for result in report:
-        print(f"{result['Sprint Name']:<30} {result['Start Date']:<12} {result['End Date']:<12} {result['Status']:<10} {result['Completed']:<10} {result['Not Completed']:<15} {result['Added During Sprint']:<10} {result['Removed During Sprint']:<10} {result['Completion %']:<12} {result['Insight']:<40}") 
+        print(f"{result['Sprint Name']:<30} {result['Start Date']:<12} {result['End Date']:<12} {result['Status']:<10} {result['Initial Planned']:<20} {result['Completed']:<10} {result['Not Completed']:<15} {result['Added During Sprint']:<10} {result['Removed During Sprint']:<10} {result['Completion %']:<12} {result['Insight']:<40}") 
