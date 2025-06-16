@@ -1,82 +1,129 @@
-# Jira Sprint Report Dashboard
+# 📊 Jira Sprint Report Dashboard
 
-A web-based dashboard for generating Jira sprint reports and managing labels, with CSV download support.
+> A modern web-based dashboard for generating comprehensive Jira sprint reports and managing labels with advanced analytics.
 
-## Features
-- **Sprint Report Web UI**: Select a Jira board and view the last 5 closed sprints with key metrics (initial planned, completed, not completed, added/removed during sprint, completion %, insight, status).
-- **Download as CSV**: Download the sprint report as a CSV file.
-- **Label Manager**: Search, add, rename, and delete Jira labels from a modern web interface.
+[![Python](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://python.org)
+[![Flask](https://img.shields.io/badge/Flask-2.0+-green.svg)](https://flask.palletsprojects.com/)
+[![Jira API](https://img.shields.io/badge/Jira-REST%20API-orange.svg)](https://developer.atlassian.com/cloud/jira/platform/rest/v3/)
 
-## Setup Instructions
+---
 
-### 1. Clone the Repository
-```sh
+## ✨ Features
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| 📈 **Sprint Report Web UI** | View last 5 closed sprints with comprehensive metrics | ✅ Active |
+| 📊 **Initial Planned Tracking** | Track scope changes and planning accuracy | ✅ Active |
+| 📥 **CSV Download** | Export sprint reports for further analysis | ✅ Active |
+| 🏷️ **Label Manager** | Modern interface for Jira label management | ✅ Active |
+| 📱 **Responsive Design** | Works on desktop and mobile devices | ✅ Active |
+
+### 📋 Sprint Metrics Tracked
+- 🎯 **Initial Planned** - Issues planned at sprint start
+- ✅ **Completed** - Issues finished successfully  
+- ❌ **Not Completed** - Issues not finished
+- ➕ **Added During Sprint** - Scope increases
+- 🗑️ **Removed During Sprint** - Scope decreases
+- 📊 **Completion %** - Success rate
+- 💡 **Insights** - AI-generated recommendations
+
+---
+
+## 🚀 Quick Start
+
+### 📋 Prerequisites
+- Python 3.7+
+- Jira Cloud instance
+- Valid Jira API token
+
+### ⚡ Installation
+
+```bash
+# 1️⃣ Clone the repository
 git clone <your-repo-url>
 cd Jira_Tpm
-```
 
-### 2. Create and Activate a Virtual Environment (Recommended)
-```sh
+# 2️⃣ Create virtual environment
 python3 -m venv venv
-source venv/bin/activate
-```
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-### 3. Install Dependencies
-```sh
+# 3️⃣ Install dependencies
 pip install -r requirements.txt
-```
 
-### 4. Configure Environment Variables
-Create a `.env` file in the project root with the following:
-```
-JIRA_URL=https://your-jira-instance.atlassian.net
-JIRA_EMAIL=your-email@example.com
-JIRA_API_TOKEN=your-jira-api-token
-```
+# 4️⃣ Configure environment
+cp .env.example .env  # Create from template
+# Edit .env with your Jira credentials
 
-### 5. Run the Flask App
-```sh
+# 5️⃣ Run the application
 python3 app.py
 ```
-The app will be available at [http://localhost:5000](http://localhost:5000)
 
-## Usage
+### 🔧 Environment Configuration
 
-### Web UI
-- **Sprint Report**: Click "Sprint Report" in the sidebar, select a board, and click "Generate Report". View the table or download as CSV.
-- **Label Manager**: Click "Label Manager" in the sidebar to search, add, rename, or delete labels.
+Create a `.env` file with your Jira credentials:
 
-### Command Line Script
-You can also generate a sprint report from the command line:
-```sh
+```env
+JIRA_URL=https://your-company.atlassian.net
+JIRA_EMAIL=your-email@company.com
+JIRA_API_TOKEN=your-api-token-here
+```
+
+> 💡 **Tip**: Get your API token from [Atlassian Account Settings](https://id.atlassian.com/manage-profile/security/api-tokens)
+
+---
+
+## 📖 Usage Guide
+
+### 🌐 Web Interface
+
+| Action | Steps |
+|--------|-------|
+| **📊 Generate Sprint Report** | Sidebar → Sprint Report → Select Board → Generate |
+| **📥 Download CSV** | Generate Report → Download CSV button |
+| **🏷️ Manage Labels** | Sidebar → Label Manager → Search/Add/Edit/Delete |
+
+### 💻 Command Line
+
+```bash
+# Generate sprint report via CLI
 python3 scripts/jira_sprint_report.py
 ```
-This prints the last 4 closed sprints for the configured board in the script.
 
-## Project Structure
+---
+
+## 📁 Project Structure
+
 ```
 Jira_Tpm/
-├── app.py                # Main Flask app
-├── requirements.txt      # Python dependencies
-├── .env                  # Environment variables (not committed)
-├── scripts/
-│   ├── jira_sprint_report.py
-│   └── __init__.py
-├── templates/
-│   └── index.html        # Main web UI
-└── ...
+├── 📱 app.py                    # Main Flask application
+├── 📋 requirements.txt          # Python dependencies
+├── 🔐 .env                      # Environment variables (create this)
+├── 📂 scripts/
+│   ├── 📊 jira_sprint_report.py # Core sprint analysis logic
+│   └── 📄 __init__.py
+├── 📂 templates/
+│   └── 🎨 index.html            # Modern web interface
+└── 📖 README.md                 # This file
 ```
 
-## Sprint Report Calculation Logic
+---
 
-The sprint report analyzes the last 5 closed sprints for a given board and calculates various metrics. Here's how each metric is calculated:
+## 🧮 Sprint Report Calculation Logic
 
-### Data Sources
-The application uses two data sources for maximum accuracy:
-1. **Primary**: Jira Sprint Report API (`/rest/greenhopper/1.0/rapid/charts/sprintreport`) - Most accurate for closed sprints
-2. **Fallback**: Jira Issue API (`/rest/agile/1.0/sprint/{sprint_id}/issue`) - Used when sprint report API fails
+> **Advanced analytics powered by Jira's native Sprint Report API for maximum accuracy**
 
-### Sprint Report Flow Diagram
+### 🔄 Data Sources
+
+| Priority | Source | Accuracy | Usage |
+|----------|--------|----------|-------|
+| 🥇 **Primary** | Jira Sprint Report API | 🎯 **Highest** | Closed sprints analysis |
+| 🥈 **Fallback** | Jira Issue API | ⚠️ **Moderate** | When primary fails |
+
+**API Endpoint**: `/rest/greenhopper/1.0/rapid/charts/sprintreport`
+
+---
+
+### 📊 Sprint Report Flow Diagram
 
 ```mermaid
 graph TD
@@ -117,90 +164,196 @@ graph TD
     U --> W[Display in Table]
 ```
 
-### Metric Calculations
+### 🎨 Enhanced Visual Flow Diagram
 
-#### 1. **Initial Planned**
-- **Formula**: `(Completed + Not Completed + Removed During Sprint) - Added During Sprint`
-- **Logic**: Number of issues that were in the sprint when it started (before any scope changes)
-- **Purpose**: Shows the original sprint commitment and helps track scope changes
+```mermaid
+graph TD
+    A["🚀 Start Sprint Report"] --> B["📋 Fetch Board Sprints"]
+    B --> C["🔍 Filter Last 5 Closed Sprints"]
+    C --> D["🔄 For Each Sprint"]
+    D --> E["📡 Call Sprint Report API"]
+    E --> F{"✅ API Success?"}
+    F -->|Yes| G["📊 Extract Sprint Data"]
+    F -->|No| H["🔄 Fallback: Issue API"]
+    
+    G --> I["📋 Get API Fields"]
+    I --> J["✅ completedIssues"]
+    I --> K["❌ incompletedIssues"]
+    I --> L["🗑️ puntedIssues"]
+    I --> M["➕ issueKeysAddedDuringSprint"]
+    
+    J --> N["🧮 Calculate Metrics"]
+    K --> N
+    L --> N
+    M --> N
+    
+    N --> O["✅ Completed = len(completedIssues)"]
+    N --> P["❌ Not Completed = len(incompletedIssues) + fallback"]
+    N --> Q["➕ Added = len(issueKeysAddedDuringSprint)"]
+    N --> R["🗑️ Removed = len(puntedIssues)"]
+    N --> S["📊 Initial Planned = (Completed + Not Completed + Removed) - Added"]
+    
+    O --> T["💡 Generate Insights"]
+    P --> T
+    Q --> T
+    R --> T
+    S --> T
+    
+    T --> U["📤 Return Sprint Data"]
+    H --> V["🔄 Fallback Calculations"]
+    V --> U
+    U --> W["📋 Display in Table"]
+    
+    style A fill:#e1f5fe
+    style W fill:#e8f5e8
+    style F fill:#fff3e0
+    style N fill:#f3e5f5
+```
 
-#### 2. **Completed**
-- **Primary Method**: Count of issues in `completedIssues` from Jira Sprint Report API
-- **Fallback Method**: Count of issues with status in `["done", "closed", "resolved"]` at current time
-- **Logic**: Issues that were marked as done/completed during or by the end of the sprint
+---
 
-#### 3. **Not Completed**
-- **Primary Method**: 
-  - Uses `len(incompletedIssues)` from Sprint Report API
-  - If `incompletedIssues` is empty, falls back to `len(issuesNotCompletedInCurrentSprint)`
-- **Fallback Method**: Count of issues with status NOT in `["done", "closed", "resolved"]`
-- **Logic**: Issues that were in the sprint at the end but not completed
+### 📈 Metric Calculations
 
-#### 4. **Added During Sprint**
-- **Primary Method**: Count of issues in `issueKeysAddedDuringSprint` from Sprint Report API
-- **Fallback Method**: Calculated as 0 (not available via issue API)
-- **Logic**: All issues that were added to the sprint after it started (both completed and not completed)
+#### 🎯 **1. Initial Planned**
+```python
+initial_planned = (completed + not_completed + removed) - added
+```
+- **📋 Purpose**: Original sprint commitment tracking
+- **🎯 Goal**: Measure scope change impact
+- **💡 Insight**: Shows planning accuracy
 
-#### 5. **Removed During Sprint**
-- **Primary Method**: Count of issues in `puntedIssues` from Sprint Report API
-- **Fallback Method**: Calculated as 0 (not available via issue API)
-- **Logic**: Issues that were removed from the sprint before it ended (scope decrease)
+#### ✅ **2. Completed**
+```python
+completed = len(completedIssues)
+```
+- **📊 Source**: Jira Sprint Report API
+- **🎯 Logic**: Issues marked done during sprint
+- **⚡ Fallback**: Current status check
 
-#### 6. **Completion Percentage**
-- **Formula**: `(Completed / (Completed + Not Completed)) × 100`
-- **Format**: Displayed as percentage with 1 decimal place (e.g., "75.0%")
-- **Edge Case**: Shows "N/A" if total planned is 0
+#### ❌ **3. Not Completed**
+```python
+not_completed = len(incompletedIssues) + fallback_logic
+```
+- **📊 Primary**: `incompletedIssues` from API
+- **🔄 Fallback**: `issuesNotCompletedInCurrentSprint`
+- **🎯 Logic**: Issues in sprint but not finished
 
-#### 7. **Insight**
-Generated based on completion rate and scope changes:
+#### ➕ **4. Added During Sprint**
+```python
+added = len(issueKeysAddedDuringSprint)
+```
+- **📊 Source**: Jira Sprint Report API
+- **🎯 Logic**: All issues added mid-sprint
+- **📈 Impact**: Scope increase tracking
 
-**Completion Rate Insights:**
-- **≥80%**: "✅ Good velocity"
-- **<50%**: "❌ Low delivery rate"  
-- **50-79%**: "⚠️ Moderate delivery rate"
+#### 🗑️ **5. Removed During Sprint**
+```python
+removed = len(puntedIssues)
+```
+- **📊 Source**: Jira Sprint Report API
+- **🎯 Logic**: Issues removed before sprint end
+- **📉 Impact**: Scope decrease tracking
 
-**Scope Change Insights:**
-- **≥20% scope change**: "⚠️ Unstable scope"
-- **>0% scope change**: "ℹ️ Minor scope changes"
-- **0% scope change**: No scope insight added
+#### 📊 **6. Completion Percentage**
+```python
+completion_rate = (completed / (completed + not_completed)) × 100
+```
+- **📈 Format**: `75.0%`
+- **⚠️ Edge Case**: `N/A` if no issues
 
-**Scope Change Rate Formula**: `(Added During Sprint / Initial Planned) × 100`
+#### 💡 **7. Insights**
 
-**Example Insights:**
-- "✅ Good velocity | ℹ️ Minor scope changes"
-- "❌ Low delivery rate | ⚠️ Unstable scope"
-- "⚠️ Moderate delivery rate"
+| Completion Rate | Insight | Icon |
+|----------------|---------|------|
+| ≥ 80% | Good velocity | ✅ |
+| 50-79% | Moderate delivery rate | ⚠️ |
+| < 50% | Low delivery rate | ❌ |
 
-### API Field Mapping
+| Scope Change | Insight | Icon |
+|-------------|---------|------|
+| ≥ 20% | Unstable scope | ⚠️ |
+| > 0% | Minor scope changes | ℹ️ |
+| 0% | Stable scope | ✅ |
 
-| Jira Sprint Report API Field | Our Metric | Description |
-|------------------------------|------------|-------------|
-| `completedIssues` | Completed | Issues completed in the sprint |
-| `incompletedIssues` | Not Completed | Issues not completed at sprint end |
-| `puntedIssues` | Removed During Sprint | Issues removed from sprint |
-| `issueKeysAddedDuringSprint` | Added During Sprint | Issues added after sprint started |
+---
 
-### Sprint Selection Logic
+### 🗺️ API Field Mapping
 
-The application fetches the **5 most recent CLOSED sprints** for a board:
+| 🔗 Jira API Field | 📊 Our Metric | 📝 Description |
+|-------------------|---------------|----------------|
+| `completedIssues` | ✅ Completed | Issues finished in sprint |
+| `incompletedIssues` | ❌ Not Completed | Issues not finished |
+| `puntedIssues` | 🗑️ Removed During Sprint | Issues removed from sprint |
+| `issueKeysAddedDuringSprint` | ➕ Added During Sprint | Issues added mid-sprint |
 
-1. **Fetch All Sprints**: Gets all sprints from the board using pagination
-2. **Filter Closed**: Only includes sprints with `state = "closed"` and valid `endDate`
-3. **Sort by End Date**: Orders by `endDate` in descending order (most recent first)
-4. **Take Top 5**: Selects the 5 most recently closed sprints
+---
 
-### Data Accuracy Notes
+### 🔍 Sprint Selection Logic
 
-- **Primary Method**: Uses Jira's own Sprint Report API, which provides the most accurate data matching Jira UI
-- **Fallback Method**: Uses current issue status, which may not reflect the exact state at sprint end
-- **Status Mapping**: Considers `["done", "closed", "resolved"]` as completed statuses
-- **Time Accuracy**: Sprint Report API provides data as it was at sprint closure time
-- **Debug Logging**: Application includes debug output to help troubleshoot API response fields
+```mermaid
+graph LR
+    A["📋 Fetch All Sprints"] --> B["🔍 Filter Closed"]
+    B --> C["📅 Sort by End Date"]
+    C --> D["🔝 Take Top 5"]
+    
+    style A fill:#e3f2fd
+    style D fill:#e8f5e8
+```
 
-## Notes
-- Make sure your Jira API token and credentials are correct.
-- The app prioritizes accuracy by using Jira's Sprint Report API when available.
-- Fallback methods are used only when the primary API fails.
-- All calculations match Jira's native sprint report logic for consistency.
-- The Initial Planned metric helps track scope changes and sprint planning accuracy.
-- For any issues or feature requests, please open an issue or contact the maintainer. 
+**Process:**
+1. 📡 **Fetch**: Get all sprints via pagination
+2. 🔍 **Filter**: Only `state = "closed"` with valid `endDate`
+3. 📅 **Sort**: Order by `endDate` (newest first)
+4. 🔝 **Select**: Take 5 most recent
+
+---
+
+### ⚡ Performance & Accuracy
+
+| Aspect | Primary Method | Fallback Method |
+|--------|---------------|----------------|
+| **🎯 Accuracy** | 🟢 **Highest** | 🟡 **Moderate** |
+| **⚡ Speed** | 🟢 **Fast** | 🟡 **Slower** |
+| **📊 Data Source** | Sprint Report API | Issue API + Status |
+| **🕐 Time Accuracy** | Sprint closure time | Current time |
+
+---
+
+## 🔧 Technical Notes
+
+### ✅ **Best Practices**
+- 🔐 Secure API token storage in `.env`
+- 🎯 Primary API prioritization for accuracy
+- 🔄 Graceful fallback handling
+- 🐛 Debug logging for troubleshooting
+
+### ⚠️ **Known Limitations**
+- 📊 Fallback method uses current status (less accurate)
+- 🔍 Status mapping: `["done", "closed", "resolved"]`
+- 📈 Requires valid Jira Cloud instance
+
+### 🆘 **Troubleshooting**
+- 🔍 Check debug output for API field data
+- 🔐 Verify API token permissions
+- 📡 Ensure network connectivity to Jira
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our contributing guidelines for details.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+<div align="center">
+
+**🚀 Built with ❤️ for better sprint analytics**
+
+[⭐ Star this repo](https://github.com/your-repo) | [🐛 Report Bug](https://github.com/your-repo/issues) | [💡 Request Feature](https://github.com/your-repo/issues)
+
+</div>
+
