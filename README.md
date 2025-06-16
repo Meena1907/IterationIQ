@@ -3,10 +3,9 @@
 A web-based dashboard for generating Jira sprint reports and managing labels, with CSV download support.
 
 ## Features
-- **Sprint Report Web UI**: Select a Jira board and view the last 4 closed sprints with key metrics (completed, not completed, added/removed during sprint, completion %, insight, status).
+- **Sprint Report Web UI**: Select a Jira board and view the last 5 closed sprints with key metrics (completed, not completed, added/removed during sprint, completion %, insight, status).
 - **Download as CSV**: Download the sprint report as a CSV file.
 - **Label Manager**: Search, add, rename, and delete Jira labels from a modern web interface.
-- **Board Selection**: Dropdown to select from all available Jira boards.
 
 ## Setup Instructions
 
