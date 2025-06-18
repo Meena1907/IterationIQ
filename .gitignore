@@ -24,13 +24,55 @@ wheels/
 # Environment variables
 .env
 .env.*
+.env.local
+.env.*.local
+.envrc.local
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+.aswb/
+.cache/
+.classpath
+.clwb/
+.factorypath
+.ijwb/
+.project
+.settings/
+.eclipse/
+eclipse-*bin/
+bazel.iml
 
-# OS
+# Bazel
+.bazelrc.local
+bazel-*
+output/
+.bazelversion
+
+# Build and cache
+production
+.sass-cache
+
+# Compiled files
+*.class
+*.o
+*.pyc
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# OS generated files
 .DS_Store
-Thumbs.db 
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node
+node_modules/

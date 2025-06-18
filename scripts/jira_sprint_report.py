@@ -9,7 +9,6 @@ import time
 JIRA_URL = "https://thoughtspot.atlassian.net"  # <-- Replace with your Jira URL
 EMAIL = "meena.singh@thoughtspot.com"                # <-- Replace with your Jira email
 API_TOKEN = "ATATT3xFfGF0JszDBw4GIFkxCtqvSpztaOKsZQtNhSdMfUProZGCtlnx4iCidWqeUQTHBYdfpfyDdHMFaUbEeuCjvCjiLYfoL0IZOlf1F3E8Tqo-QNa7h7CS6M_syvuKXxmqmQfXCTs7hV7dR5L1iag-hqT0yI0XorBghQP9R_K8HveJshcvWag=23A6771A"                    # <-- Replace with your Jira API token
-BOARD_ID = "1697"                      # <-- Replace with your board ID
 SPRINT_FIELD_ID = "customfield_10020"
 DONE_STATUSES = {"CANCELLED", "DUPLICATE", "RESOLVED", "CLOSED"}
 
@@ -26,24 +25,75 @@ def get_board_id(board_name):
         return data["values"][0]["id"]
     return None
 
-def get_latest_4_sprints(board_id):
-    url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint"
-    params = {
-        "state": "closed",
-        "maxResults": 50  # Get more sprints to ensure we have enough closed ones
-    }
-    resp = requests.get(url, headers=headers, auth=auth, params=params)
-    resp.raise_for_status()
-    sprints = resp.json().get("values", [])
-    
-    # Filter for closed sprints with end dates
-    closed_sprints = [s for s in sprints if s.get("state") == "closed" and s.get("endDate")]
-    
-    # Sort by end date to ensure correct order (newest first)
-    closed_sprints.sort(key=lambda x: x.get("endDate", ""), reverse=True)
-    
-    # Return the 4 most recent closed sprints
-    return closed_sprints[:4]
+def get_sprints_for_board(board_id):
+    try:
+        url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint"
+        params = {
+            "maxResults": 5  # Get more sprints to ensure we have enough
+        }
+        print(f"\nFetching sprints for board {board_id}")
+        resp = requests.get(url, headers=headers, auth=auth, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+        all_sprints = data.get("values", [])
+        
+        if not all_sprints:
+            print(f"No sprints found for board {board_id}")
+            return []
+        
+        print(f"Total sprints found: {len(all_sprints)}")
+        
+        # Separate active and closed sprints
+        active_sprints = [s for s in all_sprints if s.get("state") == "active"]
+        closed_sprints = [s for s in all_sprints if s.get("state") == "closed" and s.get("endDate")]
+        
+        print(f"Active sprints: {len(active_sprints)}")
+        print(f"Closed sprints: {len(closed_sprints)}")
+        
+        # Sort closed sprints by end date (newest first)
+        closed_sprints.sort(key=lambda x: x.get("endDate", ""), reverse=True)
+        
+        # If there are active sprints, get last 5 closed sprints for each active sprint
+        if active_sprints:
+            result_sprints = []
+            for active_sprint in active_sprints:
+                active_name = active_sprint.get("name", "Unknown")
+                active_start_date = active_sprint.get("startDate")
+                print(f"\nProcessing active sprint: {active_name}")
+                print(f"Start date: {active_start_date}")
+                
+                if active_start_date:
+                    # Get sprints that ended before this active sprint started
+                    relevant_closed = [s for s in closed_sprints if s.get("endDate") < active_start_date]
+                    print(f"Found {len(relevant_closed)} closed sprints before this active sprint")
+                    
+                    # Take last 5 sprints for this active sprint
+                    sprints_to_add = relevant_closed[:5]
+                    print(f"Adding {len(sprints_to_add)} closed sprints to report")
+                    for sprint in sprints_to_add:
+                        print(f"- {sprint.get('name')} (ended: {sprint.get('endDate')})")
+                    
+                    result_sprints.extend(sprints_to_add)
+            
+            # Add active sprints
+            print("\nAdding active sprints to report:")
+            for sprint in active_sprints:
+                print(f"- {sprint.get('name')} (started: {sprint.get('startDate')})")
+            result_sprints.extend(active_sprints)
+            
+            # Sort by end date (active sprints will be at the end)
+            result_sprints.sort(key=lambda x: x.get("endDate", "9999-12-31"), reverse=True)
+            
+            print(f"\nFinal report will contain {len(result_sprints)} sprints")
+            return result_sprints
+        else:
+            # If no active sprints, just return last 5 closed sprints
+            print("\nNo active sprints found, returning last 5 closed sprints")
+            return closed_sprints[:5]
+            
+    except Exception as e:
+        print(f"Error fetching sprints: {str(e)}")
+        return []
 
 def get_sprint_report(board_id, sprint_id):
     url = f"{JIRA_URL}/rest/greenhopper/1.0/rapid/charts/sprintreport"
@@ -75,58 +125,173 @@ def generate_insight(completed, not_completed, scope_change, total_planned):
         
     return " | ".join(insights)
 
-def analyze_sprint(sprint, sprint_report):
-    sprint_id = sprint["id"]
-    sprint_name = sprint["name"]
-    start_date = sprint.get("startDate", "N/A")
-    end_date = sprint.get("endDate", "N/A")
-    state = sprint.get("state", "N/A")
-    
-    # Extract data from sprint report
-    contents = sprint_report.get("contents", {})
-    completed_issues = contents.get("completedIssues", [])
-    not_completed_issues = contents.get("issuesNotCompletedInCurrentSprint", [])
-    added_issues = contents.get("issueKeysAddedDuringSprint", [])
-    removed_issues = contents.get("puntedIssues", [])  # Issues removed during sprint
-    
-    # Match Jira UI: include all completed and not completed issues
-    completed = completed_issues
-    not_completed = not_completed_issues
-    
-    total_planned = len(completed) + len(not_completed)
-    completion_pct = f"{(len(completed) / total_planned * 100):.1f}%" if total_planned > 0 else "N/A"
-    
-    # Generate insights
-    insight = generate_insight(
-        len(completed),
-        len(not_completed),
-        len(added_issues),
-        total_planned
-    )
-    
-    return {
-        "Sprint Name": sprint_name,
-        "Start Date": start_date[:10] if start_date != "N/A" else "N/A",
-        "End Date": end_date[:10] if end_date != "N/A" else "N/A",
-        "Status": state,
-        "Completed": len(completed),
-        "Not Completed": len(not_completed),
-        "Added During Sprint": len(added_issues),
-        "Removed During Sprint": len(removed_issues),
-        "Completion %": completion_pct,
-        "Insight": insight
-    }
+def analyze_sprint(sprint, board_id=None):
+    try:
+        if not sprint:
+            print("Invalid sprint data")
+            return None
+            
+        sprint_id = sprint.get("id")
+        if not sprint_id:
+            print("Missing sprint ID")
+            return None
+            
+        sprint_name = sprint.get("name", "Unknown Sprint")
+        start_date = sprint.get("startDate", "N/A")
+        end_date = sprint.get("endDate", "N/A")
+        state = sprint.get("state", "N/A")
+        
+        print(f"\nAnalyzing sprint: {sprint_name}")
+        print(f"State: {state}")
+        print(f"Start: {start_date}")
+        print(f"End: {end_date}")
+        
+        # Get all issues in the sprint using the sprint report API (more accurate)
+        try:
+            # Try to get sprint report first (more accurate for closed sprints)
+            sprint_report_url = f"{JIRA_URL}/rest/greenhopper/1.0/rapid/charts/sprintreport"
+            params = {"rapidViewId": board_id or "2008", "sprintId": sprint_id}
+            sprint_report_resp = requests.get(sprint_report_url, headers=headers, auth=auth, params=params)
+            
+            if sprint_report_resp.status_code == 200:
+                sprint_report = sprint_report_resp.json()
+                
+                # Get the correct fields from Jira Sprint Report API
+                completed_issues = sprint_report.get("contents", {}).get("completedIssues", [])
+                incomplete_issues = sprint_report.get("contents", {}).get("incompletedIssues", [])
+                punted_issues = sprint_report.get("contents", {}).get("puntedIssues", [])
+                issues_not_completed_in_current_sprint = sprint_report.get("contents", {}).get("issuesNotCompletedInCurrentSprint", [])
+                issue_keys_added_during_sprint = sprint_report.get("contents", {}).get("issueKeysAddedDuringSprint", [])
+                
+                # Debug: Print what we actually got from the API
+                print(f"DEBUG - API Response fields:")
+                print(f"  completedIssues: {len(completed_issues)} items")
+                print(f"  incompletedIssues: {len(incomplete_issues)} items")
+                print(f"  puntedIssues: {len(punted_issues)} items")
+                print(f"  issuesNotCompletedInCurrentSprint: {len(issues_not_completed_in_current_sprint)} items")
+                print(f"  issueKeysAddedDuringSprint: {len(issue_keys_added_during_sprint)} items")
+                
+                # Correct calculations
+                completed_count = len(completed_issues)
+                # If incompletedIssues is empty, use issuesNotCompletedInCurrentSprint as fallback
+                if len(incomplete_issues) == 0 and len(issues_not_completed_in_current_sprint) > 0:
+                    not_completed_count = len(issues_not_completed_in_current_sprint)
+                    print(f"DEBUG - Using issuesNotCompletedInCurrentSprint for not_completed_count")
+                else:
+                    not_completed_count = len(incomplete_issues)
+                    print(f"DEBUG - Using incompletedIssues for not_completed_count")
+                
+                added_during_sprint = len(issue_keys_added_during_sprint)
+                removed_during_sprint = len(punted_issues)
+                
+                # Initial planned: issues present at sprint start
+                initial_planned = (completed_count + not_completed_count + removed_during_sprint) - added_during_sprint
+                
+                print(f"Using sprint report API:")
+                print(f"Initial Planned: {initial_planned}")
+                print(f"Completed: {completed_count}")
+                print(f"Not Completed: {not_completed_count}")
+                print(f"Added during sprint: {added_during_sprint}")
+                print(f"Removed during sprint: {removed_during_sprint}")
+                
+            else:
+                raise Exception("Sprint report API failed, falling back to issue API")
+                
+        except Exception as e:
+            print(f"Sprint report API failed: {str(e)}, using fallback method")
+            
+            # Fallback: Get all issues in the sprint
+            issues_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=100"
+            issues_resp = requests.get(issues_url, headers=headers, auth=auth)
+            issues_resp.raise_for_status()
+            issues_data = issues_resp.json()
+            issues = issues_data.get("issues", [])
+            
+            print(f"Found {len(issues)} issues in sprint (fallback method)")
+            
+            completed_count = 0
+            not_completed_count = 0
+            added_during_sprint = 0
+            removed_during_sprint = 0
+            
+            sprint_start_dt = parser.parse(start_date) if start_date != "N/A" else None
+            sprint_end_dt = parser.parse(end_date) if end_date != "N/A" else None
+            
+            for issue in issues:
+                try:
+                    issue_key = issue.get("key")
+                    if not issue_key:
+                        continue
+                    
+                    # For closed sprints, use current status as approximation
+                    # (This is less accurate but better than nothing)
+                    status = issue.get("fields", {}).get("status", {}).get("name", "").lower()
+                    if status in ["done", "closed", "resolved"]:
+                        completed_count += 1
+                    else:
+                        not_completed_count += 1
+                        
+                except Exception as e:
+                    print(f"Error processing issue {issue.get('key', 'unknown')}: {str(e)}")
+                    continue
+        
+        total_planned = completed_count + not_completed_count
+        completion_pct = f"{(completed_count / total_planned * 100):.1f}%" if total_planned > 0 else "N/A"
+        
+        # Generate insights
+        insight = generate_insight(
+            completed_count,
+            not_completed_count,
+            added_during_sprint,
+            total_planned
+        )
+        
+        return {
+            "Sprint Name": sprint_name,
+            "Start Date": start_date[:10] if start_date != "N/A" else "N/A",
+            "End Date": end_date[:10] if end_date != "N/A" else "N/A",
+            "Status": state,
+            "Initial Planned": initial_planned,
+            "Completed": completed_count,
+            "Not Completed": not_completed_count,
+            "Added During Sprint": added_during_sprint,
+            "Removed During Sprint": removed_during_sprint,
+            "Completion %": completion_pct,
+            "Insight": insight
+        }
+    except Exception as e:
+        print(f"Error analyzing sprint: {str(e)}")
+        return None
 
-def main():
-    print("\nSprint Report Summary (Last 4 Closed Sprints):")
-    print(f"{'Sprint Name':<30} {'Start':<12} {'End':<12} {'Status':<10} {'Completed':<10} {'Not Completed':<15} {'Added':<10} {'Removed':<10} {'Completion %':<12} {'Insight':<40}")
-    print("-" * 170)
-    
-    sprints = get_latest_4_sprints(BOARD_ID)
-    for sprint in sprints:
-        sprint_report = get_sprint_report(BOARD_ID, sprint["id"])
-        result = analyze_sprint(sprint, sprint_report)
-        print(f"{result['Sprint Name']:<30} {result['Start Date']:<12} {result['End Date']:<12} {result['Status']:<10} {result['Completed']:<10} {result['Not Completed']:<15} {result['Added During Sprint']:<10} {result['Removed During Sprint']:<10} {result['Completion %']:<12} {result['Insight']:<40}")
+def generate_jira_sprint_report(board_id):
+    """
+    Returns a list of dicts, one per sprint (last 5 sprints for each active sprint)
+    """
+    try:
+        report = []
+        sprints = get_sprints_for_board(board_id)
+        
+        if not sprints:
+            print(f"No sprints found for board {board_id}")
+            return []
+            
+        for sprint in sprints:
+            result = analyze_sprint(sprint, board_id)
+            if result:
+                report.append(result)
+                
+        print("DEBUG: About to return report to frontend:", report)
+        return report
+    except Exception as e:
+        print(f"Error generating sprint report: {str(e)}")
+        return []
 
+# Only run main if executed directly
 if __name__ == "__main__":
-    main() 
+    BOARD_ID = "1697"  # Default for CLI usage
+    report = generate_jira_sprint_report(BOARD_ID)
+    print("\nSprint Report Summary (Last 5 Sprints for Each Active Sprint):")
+    print(f"{'Sprint Name':<30} {'Start':<12} {'End':<12} {'Status':<10} {'Initial Planned':<20} {'Completed':<10} {'Not Completed':<15} {'Added':<10} {'Removed':<10} {'Completion %':<12} {'Insight':<40}")
+    print("-" * 170)
+    for result in report:
+        print(f"{result['Sprint Name']:<30} {result['Start Date']:<12} {result['End Date']:<12} {result['Status']:<10} {result['Initial Planned']:<20} {result['Completed']:<10} {result['Not Completed']:<15} {result['Added During Sprint']:<10} {result['Removed During Sprint']:<10} {result['Completion %']:<12} {result['Insight']:<40}") 
