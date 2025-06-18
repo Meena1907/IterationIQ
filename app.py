@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, render_template, Response
 from flask_cors import CORS
 from scripts.jira_sprint_report import generate_jira_sprint_report, analyze_sprint
+from scripts.user_capacity_analysis import analyze_user_capacity
 import requests
 import os
 import base64
@@ -97,6 +98,9 @@ sprint_report_tasks = {}
 
 # In-memory storage for background sprint trends tasks
 sprint_trends_tasks = {}
+
+# In-memory storage for background capacity analysis tasks
+capacity_analysis_tasks = {}
 
 def make_jira_request(url, params=None, method='GET', json_data=None):
     """Make a request to Jira with rate limiting and retry logic"""
@@ -1371,5 +1375,473 @@ def api_jira_sprint_report():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/capacity/analyze', methods=['POST'])
+def start_capacity_analysis():
+    """Start a background capacity analysis task for a user"""
+    try:
+        data = request.get_json()
+        user_email = data.get('user_email', '').strip()
+        weeks_back = data.get('weeks_back', 8)
+        
+        if not user_email:
+            return jsonify({'error': 'user_email is required'}), 400
+        
+        # Validate email format
+        if '@' not in user_email:
+            return jsonify({'error': 'Invalid email format'}), 400
+        
+        # Generate unique task ID
+        task_id = str(uuid.uuid4())
+        
+        # Initialize task status
+        capacity_analysis_tasks[task_id] = {
+            'status': 'in_progress',
+            'progress': 0,
+            'result': None,
+            'error': None,
+            'user_email': user_email,
+            'weeks_back': weeks_back,
+            'started_at': datetime.now().isoformat()
+        }
+        
+        # Start background task
+        thread = threading.Thread(
+            target=process_capacity_analysis,
+            args=(task_id, user_email, weeks_back)
+        )
+        thread.start()
+        
+        return jsonify({
+            'task_id': task_id,
+            'status': 'started',
+            'message': f'Capacity analysis started for {user_email}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error starting capacity analysis: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/capacity/progress/<task_id>', methods=['GET'])
+def get_capacity_analysis_progress(task_id):
+    """Get the progress of a capacity analysis task"""
+    if task_id not in capacity_analysis_tasks:
+        return jsonify({'error': 'Task not found'}), 404
+    
+    task = capacity_analysis_tasks[task_id]
+    return jsonify({
+        'task_id': task_id,
+        'status': task['status'],
+        'progress': task['progress'],
+        'user_email': task['user_email'],
+        'weeks_back': task['weeks_back'],
+        'started_at': task['started_at'],
+        'result': task['result'],
+        'error': task['error']
+    })
+
+def process_capacity_analysis(task_id, user_email, weeks_back):
+    """Background task to process capacity analysis"""
+    try:
+        logger.info(f"Starting capacity analysis for {user_email} (last {weeks_back} weeks)")
+        
+        # Update progress
+        capacity_analysis_tasks[task_id]['progress'] = 10
+        capacity_analysis_tasks[task_id]['status'] = 'fetching_data'
+        
+        # Perform the analysis
+        result = analyze_user_capacity(user_email, weeks_back)
+        
+        # Update progress
+        capacity_analysis_tasks[task_id]['progress'] = 90
+        
+        if 'error' in result:
+            capacity_analysis_tasks[task_id]['status'] = 'error'
+            capacity_analysis_tasks[task_id]['error'] = result['error']
+        else:
+            capacity_analysis_tasks[task_id]['status'] = 'completed'
+            capacity_analysis_tasks[task_id]['result'] = result
+            capacity_analysis_tasks[task_id]['progress'] = 100
+        
+        logger.info(f"Capacity analysis completed for {user_email}")
+        
+    except Exception as e:
+        logger.error(f"Error in capacity analysis for {user_email}: {str(e)}")
+        capacity_analysis_tasks[task_id]['status'] = 'error'
+        capacity_analysis_tasks[task_id]['error'] = str(e)
+
+@app.route('/api/capacity/export/<task_id>', methods=['GET'])
+def export_capacity_analysis(task_id):
+    """Export capacity analysis results as CSV with user preferences"""
+    if task_id not in capacity_analysis_tasks:
+        return jsonify({'error': 'Task not found'}), 404
+    
+    task = capacity_analysis_tasks[task_id]
+    if task['status'] != 'completed' or not task['result']:
+        return jsonify({'error': 'Analysis not completed or no results available'}), 400
+    
+    try:
+        result = task['result']
+        
+        # Get export settings from request args or use defaults
+        delimiter = request.args.get('delimiter', ',')
+        if delimiter == '\\t':
+            delimiter = '\t'
+        encoding = request.args.get('encoding', 'utf-8')
+        include_headers = request.args.get('include_headers', 'true').lower() == 'true'
+        
+        # Create CSV content
+        output = io.StringIO()
+        
+        # Write header information
+        output.write(f"Capacity Analysis Report\n")
+        output.write(f"User{delimiter}{result['user_email']}\n")
+        output.write(f"Analysis Period{delimiter}{result['analysis_period']}\n")
+        output.write(f"Overall Rating{delimiter}{result['overall_rating']}\n")
+        output.write(f"Total Issues Analyzed{delimiter}{result['total_issues_analyzed']}\n")
+        output.write(f"JIRA Link{delimiter}{result.get('jira_link', 'N/A')}\n")
+        output.write(f"JQL Query{delimiter}{result.get('jql_query', 'N/A')}\n")
+        output.write(f"Generated{delimiter}{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        output.write("\n")
+        
+        # Write issue breakdown
+        output.write("Issue Breakdown\n")
+        breakdown = result['issue_breakdown']
+        
+        output.write("Issue Types\n")
+        if include_headers:
+            output.write(f"Type{delimiter}Count{delimiter}Percentage\n")
+        for issue_type, count in sorted(breakdown['by_type'].items(), key=lambda x: x[1], reverse=True):
+            percentage = (count / breakdown['total_issues']) * 100
+            output.write(f"{issue_type}{delimiter}{count}{delimiter}{percentage:.1f}%\n")
+        output.write("\n")
+        
+        output.write("Priority Levels\n")
+        if include_headers:
+            output.write(f"Priority{delimiter}Count{delimiter}Percentage\n")
+        for priority, count in sorted(breakdown['by_priority'].items(), key=lambda x: x[1], reverse=True):
+            percentage = (count / breakdown['total_issues']) * 100
+            output.write(f"{priority}{delimiter}{count}{delimiter}{percentage:.1f}%\n")
+        output.write("\n")
+        
+        output.write("Completion Status\n")
+        if include_headers:
+            output.write(f"Status{delimiter}Count\n")
+        completion = breakdown['by_completion']
+        output.write(f"Completed{delimiter}{completion['completed']}\n")
+        output.write(f"In Progress{delimiter}{completion['in_progress']}\n")
+        output.write(f"Not Started{delimiter}{completion['not_started']}\n")
+        output.write("\n")
+
+        # Write key metrics
+        output.write("Performance Metrics\n")
+        if include_headers:
+            output.write(f"Metric{delimiter}Value\n")
+        metrics = result['metrics']
+        output.write(f"Average Completed per Week{delimiter}{metrics['avg_completed_per_week']:.1f}\n")
+        output.write(f"Average Started per Week{delimiter}{metrics['avg_started_per_week']:.1f}\n")
+        output.write(f"Completion Rate{delimiter}{metrics['completion_rate']:.1%}\n")
+        output.write(f"Average Hours per Week{delimiter}{metrics['avg_hours_per_week']:.1f}\n")
+        output.write(f"Total Completed{delimiter}{metrics['total_completed']}\n")
+        output.write(f"Total Started{delimiter}{metrics['total_started']}\n")
+        output.write(f"Total Hours{delimiter}{metrics['total_hours']:.1f}\n")
+        output.write("\n")
+        
+        # Write weekly summary
+        output.write("Weekly Summary\n")
+        if include_headers:
+            output.write(f"Week{delimiter}Completed{delimiter}Started{delimiter}Hours Spent{delimiter}Issues Worked\n")
+        for week in result['weekly_summary']:
+            output.write(f"{week['week']}{delimiter}{week['completed']}{delimiter}{week['started']}{delimiter}{week['hours_spent']}{delimiter}{week['issues_worked']}\n")
+        output.write("\n")
+        
+        # Write insights
+        output.write("Insights\n")
+        for insight in result['insights']:
+            # Remove emojis for CSV
+            clean_insight = ''.join(char for char in insight if ord(char) < 128)
+            output.write(f"{clean_insight}\n")
+        output.write("\n")
+        
+        # Write recommendations
+        output.write("Recommendations\n")
+        for rec in result['recommendations']:
+            # Remove emojis for CSV
+            clean_rec = ''.join(char for char in rec if ord(char) < 128)
+            output.write(f"{clean_rec}\n")
+        
+        output.seek(0)
+        
+        # Generate filename
+        user_name = result['user_email'].split('@')[0]
+        filename = f"capacity_analysis_{user_name}_{datetime.now().strftime('%Y%m%d')}.csv"
+        
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}'
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error exporting capacity analysis: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Settings API endpoints
+@app.route('/api/settings/test-jira', methods=['POST'])
+def test_jira_connection_settings():
+    """Test JIRA connection with provided credentials"""
+    try:
+        data = request.get_json()
+        url = data.get('url', '').strip()
+        email = data.get('email', '').strip()
+        token = data.get('token', '').strip()
+        
+        if not all([url, email, token]):
+            return jsonify({
+                'success': False, 
+                'error': 'Missing required fields'
+            })
+        
+        # Remove trailing slash from URL
+        if url.endswith('/'):
+            url = url[:-1]
+            
+        # Test connection by getting current user info
+        import requests
+        from requests.auth import HTTPBasicAuth
+        
+        test_url = f"{url}/rest/api/2/myself"
+        
+        response = requests.get(
+            test_url,
+            auth=HTTPBasicAuth(email, token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            user_info = response.json()
+            return jsonify({
+                'success': True,
+                'user_info': {
+                    'displayName': user_info.get('displayName', 'Unknown'),
+                    'emailAddress': user_info.get('emailAddress', email)
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Authentication failed (HTTP {response.status_code})'
+            })
+            
+    except requests.exceptions.Timeout:
+        return jsonify({
+            'success': False,
+            'error': 'Connection timeout - please check your URL'
+        })
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'error': 'Connection error - please check your URL'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Connection test failed: {str(e)}'
+        })
+
+@app.route('/api/settings/save-jira', methods=['POST'])
+def save_jira_config():
+    """Save JIRA configuration securely"""
+    try:
+        data = request.get_json()
+        url = data.get('url', '').strip()
+        email = data.get('email', '').strip()
+        token = data.get('token', '').strip()
+        
+        if not all([url, email, token]):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Remove trailing slash from URL
+        if url.endswith('/'):
+            url = url[:-1]
+        
+        # For this demo, we'll store in a simple way
+        # In production, you'd want to encrypt the token and store securely
+        settings_file = 'jira_settings.json'
+        
+        settings = {
+            'url': url,
+            'email': email,
+            'token_encrypted': token  # In production, encrypt this
+        }
+        
+        import json
+        with open(settings_file, 'w') as f:
+            json.dump(settings, f, indent=2)
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/settings/load-jira', methods=['GET'])
+def load_jira_config():
+    """Load saved JIRA configuration"""
+    try:
+        settings_file = 'jira_settings.json'
+        
+        if not os.path.exists(settings_file):
+            return jsonify({
+                'url': '',
+                'email': '',
+                'has_token': False
+            })
+        
+        import json
+        with open(settings_file, 'r') as f:
+            settings = json.load(f)
+        
+        return jsonify({
+            'url': settings.get('url', ''),
+            'email': settings.get('email', ''),
+            'has_token': bool(settings.get('token_encrypted'))
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Share link storage (in production, use a database)
+shared_reports = {}
+
+@app.route('/api/capacity/share-link', methods=['POST'])
+def create_share_link():
+    """Create a shareable link for a capacity analysis report"""
+    try:
+        data = request.get_json()
+        report_data = data.get('report_data')
+        screenshot_url = data.get('screenshot_url')
+        expires_in_days = data.get('expires_in_days', 7)
+        
+        if not report_data:
+            return jsonify({'error': 'Report data is required'}), 400
+        
+        # Add screenshot URL to report data if provided
+        if screenshot_url:
+            report_data['screenshot_url'] = screenshot_url
+        
+        # Generate unique share ID
+        share_id = str(uuid.uuid4())
+        
+        # Calculate expiration date
+        expiration_date = datetime.now() + timedelta(days=expires_in_days)
+        
+        # Store the shared report
+        shared_reports[share_id] = {
+            'report_data': report_data,
+            'created_at': datetime.now().isoformat(),
+            'expires_at': expiration_date.isoformat(),
+            'access_count': 0
+        }
+        
+        # Generate share URL
+        share_url = f"{request.host_url}share/{share_id}"
+        
+        return jsonify({
+            'share_id': share_id,
+            'share_url': share_url,
+            'expires_at': expiration_date.isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating share link: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/share/<share_id>')
+def view_shared_report(share_id):
+    """View a shared capacity analysis report"""
+    try:
+        if share_id not in shared_reports:
+            return render_template('error.html', 
+                                 error_title="Report Not Found",
+                                 error_message="The shared report link is invalid or has expired."), 404
+        
+        shared_report = shared_reports[share_id]
+        
+        # Check if expired
+        expiration_date = datetime.fromisoformat(shared_report['expires_at'])
+        if datetime.now() > expiration_date:
+            # Clean up expired report
+            del shared_reports[share_id]
+            return render_template('error.html',
+                                 error_title="Report Expired",
+                                 error_message="This shared report link has expired."), 410
+        
+        # Increment access count
+        shared_report['access_count'] += 1
+        
+        # Render the shared report
+        return render_template('shared_report.html', 
+                             report_data=shared_report['report_data'],
+                             share_info={
+                                 'created_at': shared_report['created_at'],
+                                 'expires_at': shared_report['expires_at'],
+                                 'access_count': shared_report['access_count']
+                             })
+        
+    except Exception as e:
+        logger.error(f"Error viewing shared report: {str(e)}")
+        return render_template('error.html',
+                             error_title="Error",
+                             error_message="An error occurred while loading the report."), 500
+
+@app.route('/api/capacity/upload-screenshot', methods=['POST'])
+def upload_screenshot():
+    """Upload and temporarily store a screenshot for sharing"""
+    try:
+        if 'screenshot' not in request.files:
+            return jsonify({'error': 'No screenshot file provided'}), 400
+        
+        file = request.files['screenshot']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Generate unique filename
+        filename = f"screenshot_{str(uuid.uuid4())}.png"
+        
+        # In production, you'd want to use cloud storage (AWS S3, etc.)
+        # For now, we'll store temporarily in memory or local storage
+        file_path = f"temp_screenshots/{filename}"
+        
+        # Create directory if it doesn't exist
+        import os
+        os.makedirs('temp_screenshots', exist_ok=True)
+        
+        # Save the file
+        file.save(file_path)
+        
+        # Generate public URL (in production, use cloud storage URL)
+        screenshot_url = f"{request.host_url}temp_screenshots/{filename}"
+        
+        return jsonify({
+            'screenshot_url': screenshot_url,
+            'filename': filename,
+            'message': 'Screenshot uploaded successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error uploading screenshot: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/temp_screenshots/<filename>')
+def serve_screenshot(filename):
+    """Serve uploaded screenshots"""
+    try:
+        from flask import send_from_directory
+        return send_from_directory('temp_screenshots', filename)
+    except Exception as e:
+        logger.error(f"Error serving screenshot: {str(e)}")
+        return "File not found", 404
+
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True, port=8080) 
