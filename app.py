@@ -1844,4 +1844,11 @@ def serve_screenshot(filename):
         return "File not found", 404
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8080) 
+    # Get port from environment variable or default to 8080
+    port = int(os.getenv('PORT', 8080))
+    # Get host from environment variable or default to localhost (0.0.0.0 for Docker)
+    host = os.getenv('HOST', '0.0.0.0')
+    # Get debug mode from environment variable
+    debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    
+    app.run(debug=debug, host=host, port=port) 
