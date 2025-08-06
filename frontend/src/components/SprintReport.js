@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Card,
@@ -24,6 +24,13 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar,
+  Divider,
+  LinearProgress,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -35,8 +42,16 @@ import {
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,
+  ContentCopy as ContentCopyIcon,
+  CameraAlt as CameraIcon,
+  WhatsApp as WhatsAppIcon,
+  Email as EmailIcon,
+  LinkedIn as LinkedInIcon,
+  GetApp as GetAppIcon,
+  Link as LinkIcon,
 } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import html2canvas from 'html2canvas';
 
 const SprintReport = () => {
   const [boardInput, setBoardInput] = useState('');
@@ -48,6 +63,21 @@ const SprintReport = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [totalSprints, setTotalSprints] = useState(0);
   const [filteredCount, setFilteredCount] = useState(0);
+  const [progress, setProgress] = useState({ current: 0, total: 15, message: '' });
+  
+  // Share and screenshot functionality
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+  const [capturedScreenshot, setCapturedScreenshot] = useState(null);
+  const [screenshotLoading, setScreenshotLoading] = useState(false);
+  const [aiInsightsDialogOpen, setAiInsightsDialogOpen] = useState(false);
+  const [aiInsights, setAiInsights] = useState(null);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  
+  // Refs for screenshot capture
+  const reportSectionRef = useRef(null);
 
   // Extract board ID from URL or input
   const extractBoardId = (input) => {
@@ -72,6 +102,7 @@ const SprintReport = () => {
     setLoading(true);
     setError('');
     setSprintData([]);
+    setProgress({ current: 0, total: 15, message: 'Starting analysis...' });
 
     try {
       const response = await fetch(`/api/jira_sprint_report_stream?board_id=${boardId}`);
@@ -97,6 +128,12 @@ const SprintReport = () => {
               const data = JSON.parse(line.slice(6));
               if (data.type === 'sprint_result') {
                 setSprintData(prev => [...prev, data.data]);
+              } else if (data.type === 'progress') {
+                if (data.current && data.total) {
+                  setProgress({ current: data.current, total: data.total, message: data.message || '' });
+                } else if (data.message) {
+                  setProgress(prev => ({ ...prev, message: data.message }));
+                }
               }
             } catch (e) {
               // Ignore parsing errors for non-JSON lines
@@ -137,6 +174,326 @@ const SprintReport = () => {
     if (percentage >= 80) return 'success';
     if (percentage >= 50) return 'warning';
     return 'error';
+  };
+
+  const getInsightProgressValue = (insight) => {
+    if (insight.includes('Good velocity') || insight.includes('✅')) return 100;
+    if (insight.includes('Low delivery') || insight.includes('❌')) return 20;
+    if (insight.includes('Moderate delivery') || insight.includes('⚠️')) return 60;
+    return 40; // Default for other insights
+  };
+
+  // Download CSV handler
+  const handleDownloadCSV = async () => {
+    if (!sprintData.length) {
+      setSnackbarMessage('No data to download');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/sprint/export-csv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sprint_data: sprintData,
+          board_id: boardId
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate CSV');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sprint_report_board_${boardId}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setSnackbarMessage('CSV downloaded successfully!');
+      setSnackbarOpen(true);
+    } catch (error) {
+      setSnackbarMessage('Failed to download CSV: ' + error.message);
+      setSnackbarOpen(true);
+    }
+  };
+
+  // Share report handler
+  const handleShareReport = async () => {
+    if (!sprintData.length) {
+      setSnackbarMessage('No data to share');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/capacity/share-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          report_data: {
+            type: 'sprint_report',
+            board_id: boardId,
+            sprint_data: sprintData,
+            generated_at: new Date().toISOString(),
+            total_sprints: sprintData.length
+          },
+          expires_in_days: 7
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create share link');
+      }
+
+      const result = await response.json();
+      setShareUrl(result.share_url);
+      setShareDialogOpen(true);
+    } catch (error) {
+      setSnackbarMessage('Failed to create share link: ' + error.message);
+      setSnackbarOpen(true);
+    }
+  };
+
+  // AI Insights handler
+  const handleAiInsights = async () => {
+    if (!sprintData.length) {
+      setSnackbarMessage('No data to analyze');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    setAiInsightsLoading(true);
+    setAiInsightsDialogOpen(true);
+
+    try {
+      const response = await fetch('/api/sprint/ai-insights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sprint_data: sprintData
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate AI insights');
+      }
+
+      const result = await response.json();
+      setAiInsights(result.insights);
+    } catch (error) {
+      setSnackbarMessage('Failed to generate AI insights: ' + error.message);
+      setSnackbarOpen(true);
+      setAiInsightsDialogOpen(false);
+    } finally {
+      setAiInsightsLoading(false);
+    }
+  };
+
+  // Screenshot capture handler
+  const handleCaptureScreenshot = async () => {
+    if (!reportSectionRef.current) {
+      setSnackbarMessage('No report section to capture');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    setScreenshotLoading(true);
+    try {
+      // Wait a bit for all elements to render properly
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const canvas = await html2canvas(reportSectionRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        scrollX: 0,
+        scrollY: 0,
+        width: reportSectionRef.current.scrollWidth,
+        height: reportSectionRef.current.scrollHeight,
+        logging: false,
+        onclone: function(clonedDoc) {
+          // Ensure all progress bars are visible in the clone
+          const progressBars = clonedDoc.querySelectorAll('.MuiLinearProgress-root');
+          progressBars.forEach(bar => {
+            bar.style.opacity = '1';
+            bar.style.visibility = 'visible';
+          });
+        }
+      });
+
+      const dataUrl = canvas.toDataURL('image/png');
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      
+      setCapturedScreenshot({
+        dataUrl,
+        blob,
+        timestamp: new Date().toISOString()
+      });
+      
+      setSnackbarMessage('Screenshot captured successfully!');
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error('Screenshot capture failed:', error);
+      setSnackbarMessage('Failed to capture screenshot');
+      setSnackbarOpen(true);
+    } finally {
+      setScreenshotLoading(false);
+    }
+  };
+
+  // Download screenshot handler
+  const handleDownloadScreenshot = () => {
+    if (!capturedScreenshot) return;
+    
+    const link = document.createElement('a');
+    const filename = `sprint-report-board-${boardId}-${new Date().toISOString().split('T')[0]}.png`;
+    link.download = filename;
+    link.href = capturedScreenshot.dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setSnackbarMessage('Screenshot downloaded!');
+    setSnackbarOpen(true);
+  };
+
+  // Share screenshot to WhatsApp
+  const handleShareToWhatsApp = () => {
+    if (!capturedScreenshot) return;
+    
+    const avgCompletion = sprintData.reduce((sum, sprint) => 
+      sum + parseFloat(sprint["Completion %"].replace('%', '')), 0) / sprintData.length;
+    
+    const summary = `🏃‍♂️ Sprint Analysis Report\n\n📋 Board: ${boardId}\n🎯 Sprints: ${sprintData.length}\n📈 Avg Completion: ${avgCompletion.toFixed(1)}%\n\nDetailed visual report attached! 📸`;
+    
+    navigator.clipboard.writeText(summary).then(() => {
+      setSnackbarMessage('Summary copied! Download the screenshot and share both to WhatsApp.');
+      setSnackbarOpen(true);
+      handleDownloadScreenshot();
+    });
+  };
+
+  // Share screenshot to Slack
+  const handleShareToSlack = () => {
+    if (!capturedScreenshot) return;
+    
+    const avgCompletion = sprintData.reduce((sum, sprint) => 
+      sum + parseFloat(sprint["Completion %"].replace('%', '')), 0) / sprintData.length;
+    
+    const summary = `🏃‍♂️ *Sprint Analysis Report*\n\n📋 *Board:* ${boardId}\n🎯 *Sprints:* ${sprintData.length}\n📈 *Avg Completion:* ${avgCompletion.toFixed(1)}%\n\nDetailed visual report attached! 📸`;
+    
+    navigator.clipboard.writeText(summary).then(() => {
+      setSnackbarMessage('Summary copied! Download the screenshot and share both to Slack.');
+      setSnackbarOpen(true);
+      handleDownloadScreenshot();
+    });
+  };
+
+  // Email with screenshot
+  const handleEmailWithScreenshot = () => {
+    if (!capturedScreenshot) return;
+    
+    const avgCompletion = sprintData.reduce((sum, sprint) => 
+      sum + parseFloat(sprint["Completion %"].replace('%', '')), 0) / sprintData.length;
+    
+    const subject = `Sprint Analysis Report - Board ${boardId} (Visual Report)`;
+    const body = `Hi,\n\nPlease find attached the sprint analysis report for Board ${boardId}.\n\nKey Highlights:\n• Total Sprints Analyzed: ${sprintData.length}\n• Average Completion Rate: ${avgCompletion.toFixed(1)}%\n• Total Completed Issues: ${sprintData.reduce((sum, s) => sum + s["Completed"], 0)}\n• Total Issues Not Completed: ${sprintData.reduce((sum, s) => sum + s["Not Completed"], 0)}\n\nThe visual report screenshot will be downloaded automatically. Please attach it to your email.\n\nBest regards`;
+    
+    handleDownloadScreenshot();
+    const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailtoUrl;
+  };
+
+  // Create visual share link with screenshot
+  const handleCreateVisualShareLink = async () => {
+    if (!capturedScreenshot) return;
+    
+    try {
+      // Convert blob to file
+      const file = new File([capturedScreenshot.blob], 'sprint-report.png', { type: 'image/png' });
+      
+      // Create form data
+      const formData = new FormData();
+      formData.append('screenshot', file);
+      formData.append('report_data', JSON.stringify({
+        type: 'sprint_report',
+        board_id: boardId,
+        sprint_data: sprintData,
+        generated_at: new Date().toISOString(),
+        total_sprints: sprintData.length
+      }));
+
+      // Upload screenshot
+      const uploadResponse = await fetch('/api/capacity/upload-screenshot', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (uploadResponse.ok) {
+        const uploadResult = await uploadResponse.json();
+        
+        // Create share link with screenshot
+        const shareResponse = await fetch('/api/capacity/share-link', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            report_data: {
+              type: 'sprint_report',
+              board_id: boardId,
+              sprint_data: sprintData,
+              generated_at: new Date().toISOString(),
+              total_sprints: sprintData.length,
+              screenshot_url: uploadResult.screenshot_url
+            },
+            expires_in_days: 7
+          })
+        });
+
+        if (shareResponse.ok) {
+          const shareResult = await shareResponse.json();
+          setShareUrl(shareResult.share_url);
+          setSnackbarMessage('Visual share link created with screenshot!');
+          setSnackbarOpen(true);
+        } else {
+          setSnackbarMessage('Failed to create share link');
+          setSnackbarOpen(true);
+        }
+      } else {
+        setSnackbarMessage('Failed to upload screenshot');
+        setSnackbarOpen(true);
+      }
+    } catch (error) {
+      console.error('Error creating visual share link:', error);
+      setSnackbarMessage('Error creating visual share link');
+      setSnackbarOpen(true);
+    }
+  };
+
+  // Copy to clipboard handler
+  const handleCopyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setSnackbarMessage('Copied to clipboard!');
+      setSnackbarOpen(true);
+    } catch (error) {
+      setSnackbarMessage('Failed to copy to clipboard');
+      setSnackbarOpen(true);
+    }
   };
 
   return (
@@ -191,9 +548,38 @@ const SprintReport = () => {
         </Alert>
       )}
 
+      {/* Progress Display */}
+      {loading && progress.current > 0 && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box display="flex" alignItems="center" gap={2}>
+              <CircularProgress size={24} />
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  {progress.message}
+                </Typography>
+                <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+                  <Typography variant="body2" fontWeight={500}>
+                    Progress: {progress.current}/{progress.total} sprints
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    ({Math.round((progress.current / progress.total) * 100)}%)
+                  </Typography>
+                </Box>
+                <LinearProgress 
+                  variant="determinate" 
+                  value={(progress.current / progress.total) * 100}
+                  sx={{ mt: 1, height: 6, borderRadius: 3 }}
+                />
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Sprint Data Section */}
       {sprintData.length > 0 && (
-        <Box>
+        <Box ref={reportSectionRef}>
           {/* Search and Actions */}
           <Card sx={{ mb: 3 }}>
             <CardContent>
@@ -243,17 +629,17 @@ const SprintReport = () => {
                     </Box>
                     <Box>
                       <Tooltip title="Download CSV">
-                        <IconButton color="primary">
+                        <IconButton color="primary" onClick={handleDownloadCSV} disabled={!sprintData.length}>
                           <DownloadIcon />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Share Report">
-                        <IconButton color="primary">
+                        <IconButton color="primary" onClick={handleShareReport} disabled={!sprintData.length}>
                           <ShareIcon />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="AI Insights">
-                        <IconButton color="primary">
+                        <IconButton color="primary" onClick={handleAiInsights} disabled={!sprintData.length}>
                           <PsychologyIcon />
                         </IconButton>
                       </Tooltip>
@@ -282,6 +668,8 @@ const SprintReport = () => {
                       <TableCell sx={{ color: 'white', fontWeight: 600 }}>Not Completed</TableCell>
                       <TableCell sx={{ color: 'white', fontWeight: 600 }}>Added During Sprint</TableCell>
                       <TableCell sx={{ color: 'white', fontWeight: 600 }}>Removed During Sprint</TableCell>
+                      <TableCell sx={{ color: 'white', fontWeight: 600 }}>Initial Planned SP</TableCell>
+                      <TableCell sx={{ color: 'white', fontWeight: 600 }}>Completed SP</TableCell>
                       <TableCell sx={{ color: 'white', fontWeight: 600 }}>Completion %</TableCell>
                       <TableCell sx={{ color: 'white', fontWeight: 600 }}>Insight</TableCell>
                       <TableCell sx={{ color: 'white', fontWeight: 600 }}>Status</TableCell>
@@ -298,24 +686,51 @@ const SprintReport = () => {
                         <TableCell>{sprint['Not Completed']}</TableCell>
                         <TableCell>{sprint['Added During Sprint']}</TableCell>
                         <TableCell>{sprint['Removed During Sprint']}</TableCell>
+                        <TableCell>{sprint['Initial Planned SP'] || 0}</TableCell>
+                        <TableCell>{sprint['Completed SP'] || 0}</TableCell>
                         <TableCell>
-                          <Chip
-                            label={sprint['Completion %']}
-                            color={getCompletionColor(sprint['Completion %'])}
-                            size="small"
-                          />
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body2" sx={{ minWidth: '40px', fontWeight: 500 }}>
+                              {sprint['Completion %']}
+                            </Typography>
+                            <Box sx={{ flexGrow: 1, position: 'relative' }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={parseFloat(sprint['Completion %'].replace('%', ''))}
+                                color={getCompletionColor(sprint['Completion %'])}
+                                sx={{
+                                  height: 8,
+                                  borderRadius: 4,
+                                  backgroundColor: '#e0e0e0',
+                                  '& .MuiLinearProgress-bar': {
+                                    borderRadius: 4,
+                                  }
+                                }}
+                              />
+                            </Box>
+                          </Box>
                         </TableCell>
                         <TableCell>
-                          <Chip
-                            label={sprint['Insight']}
-                            color={getInsightColor(sprint['Insight'])}
-                            size="small"
-                            icon={
-                              getInsightColor(sprint['Insight']) === 'success' ? <CheckCircleIcon /> :
-                              getInsightColor(sprint['Insight']) === 'error' ? <ErrorIcon /> :
-                              <WarningIcon />
-                            }
-                          />
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body2" sx={{ minWidth: '40px', fontWeight: 500 }}>
+                              {sprint['Insight']}
+                            </Typography>
+                            <Box sx={{ flexGrow: 1, position: 'relative' }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={getInsightProgressValue(sprint['Insight'])}
+                                color={getInsightColor(sprint['Insight'])}
+                                sx={{
+                                  height: 8,
+                                  borderRadius: 4,
+                                  backgroundColor: '#e0e0e0',
+                                  '& .MuiLinearProgress-bar': {
+                                    borderRadius: 4,
+                                  }
+                                }}
+                              />
+                            </Box>
+                          </Box>
                         </TableCell>
                         <TableCell>
                           <Chip
@@ -331,8 +746,541 @@ const SprintReport = () => {
               </TableContainer>
             </CardContent>
           </Card>
+
+          {/* Sprint Analytics Charts */}
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, color: 'primary.main', mb: 3 }}>
+              Sprint Analytics
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {/* Completion Rate Trend */}
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+                      Completion Rate Trend
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={filteredData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="Sprint Name" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          interval={0}
+                          tick={{ fontSize: 10 }}
+                        />
+                        <YAxis 
+                          domain={[0, 100]}
+                          tickFormatter={(value) => `${value}%`}
+                        />
+                        <RechartsTooltip 
+                          formatter={(value) => [`${value}%`, 'Completion Rate']}
+                          labelFormatter={(label) => `Sprint: ${label}`}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey={(data) => parseFloat(data['Completion %'].replace('%', ''))}
+                          stroke="#00ABE4" 
+                          strokeWidth={3}
+                          dot={{ fill: '#00ABE4', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Sprint Scope Changes */}
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+                      Sprint Scope Changes
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={filteredData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="Sprint Name" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          interval={0}
+                          tick={{ fontSize: 10 }}
+                        />
+                        <YAxis />
+                        <RechartsTooltip 
+                          formatter={(value, name) => [value, name]}
+                          labelFormatter={(label) => `Sprint: ${label}`}
+                        />
+                        <Bar 
+                          dataKey="Added During Sprint" 
+                          fill="#0066CC" 
+                          name="Added During Sprint"
+                        />
+                        <Bar 
+                          dataKey="Removed During Sprint" 
+                          fill="#FF6B9D" 
+                          name="Removed During Sprint"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Sprint Velocity Overview */}
+              <Grid item xs={12}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+                      Sprint Velocity Overview
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={filteredData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="Sprint Name" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          interval={0}
+                          tick={{ fontSize: 10 }}
+                        />
+                        <YAxis />
+                        <RechartsTooltip 
+                          formatter={(value, name) => [value, name]}
+                          labelFormatter={(label) => `Sprint: ${label}`}
+                        />
+                        <Bar 
+                          dataKey="Completed" 
+                          stackId="a" 
+                          fill="#00ABE4" 
+                          name="Completed"
+                        />
+                        <Bar 
+                          dataKey="Not Completed" 
+                          stackId="a" 
+                          fill="#FFD700" 
+                          name="Not Completed"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Box>
         </Box>
       )}
+
+      {/* Share Dialog */}
+      <Dialog open={shareDialogOpen} onClose={() => setShareDialogOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ 
+          borderBottom: '1px solid #e0e0e0', 
+          pb: 2,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, color: 'primary.main' }}>
+            Share Sprint Report
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          {/* Report Summary */}
+          <Card sx={{ mb: 3, backgroundColor: '#f8f9fa' }}>
+            <CardContent>
+              <Grid container spacing={2}>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="text.secondary">Board ID</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{boardId}</Typography>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="text.secondary">Total Sprints</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{sprintData.length}</Typography>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="text.secondary">Report Type</Typography>
+                  <Chip label="Sprint Analysis" size="small" color="primary" variant="outlined" />
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="text.secondary">Average Completion</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {(sprintData.reduce((sum, sprint) => sum + parseFloat(sprint["Completion %"].replace('%', '')), 0) / sprintData.length).toFixed(1)}%
+                  </Typography>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="text.secondary">Generated</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {new Date().toLocaleDateString()}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Typography variant="caption" color="text.secondary">Latest Sprint</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {sprintData[0]?.['Sprint Name'] || 'N/A'}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {/* Sharing Options */}
+          <Grid container spacing={3}>
+            {/* Visual Share Column */}
+            <Grid item xs={12} md={4}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+                Visual Share
+              </Typography>
+              <Box display="flex" flexDirection="column" gap={1}>
+                <Button
+                  variant="contained"
+                  startIcon={screenshotLoading ? <CircularProgress size={20} /> : <CameraIcon />}
+                  onClick={handleCaptureScreenshot}
+                  disabled={screenshotLoading}
+                  fullWidth
+                >
+                  {screenshotLoading ? 'Capturing...' : 'Capture Screenshot'}
+                </Button>
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<WhatsAppIcon />}
+                  onClick={handleShareToWhatsApp}
+                  disabled={!capturedScreenshot}
+                  fullWidth
+                >
+                  Share Image to WhatsApp
+                </Button>
+                <Button
+                  variant="contained"
+                  color="info"
+                  startIcon={<LinkedInIcon />}
+                  onClick={handleShareToSlack}
+                  disabled={!capturedScreenshot}
+                  fullWidth
+                >
+                  Share Image to Slack
+                </Button>
+                <Button
+                  variant="contained"
+                  color="warning"
+                  startIcon={<EmailIcon />}
+                  onClick={handleEmailWithScreenshot}
+                  disabled={!capturedScreenshot}
+                  fullWidth
+                >
+                  Email with Image
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<GetAppIcon />}
+                  onClick={handleDownloadScreenshot}
+                  disabled={!capturedScreenshot}
+                  fullWidth
+                >
+                  Download Image
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<LinkIcon />}
+                  onClick={handleCreateVisualShareLink}
+                  disabled={!capturedScreenshot}
+                  fullWidth
+                >
+                  Create Visual Share Link
+                </Button>
+              </Box>
+            </Grid>
+
+            {/* Quick Share Column */}
+            <Grid item xs={12} md={4}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+                Quick Share
+              </Typography>
+              <Box display="flex" flexDirection="column" gap={1}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<LinkedInIcon />}
+                  onClick={() => {
+                    const text = `Sprint Analysis Report - Board ${boardId}\nTotal Sprints: ${sprintData.length}\nAverage Completion: ${(sprintData.reduce((sum, sprint) => sum + parseFloat(sprint["Completion %"].replace('%', '')), 0) / sprintData.length).toFixed(1)}%`;
+                    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}&title=${encodeURIComponent('Sprint Analysis Report')}&summary=${encodeURIComponent(text)}`, '_blank');
+                  }}
+                  fullWidth
+                >
+                  Share to LinkedIn
+                </Button>
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<WhatsAppIcon />}
+                  onClick={() => {
+                    const text = `🏃‍♂️ Sprint Analysis Report\n\n📋 Board: ${boardId}\n🎯 Sprints: ${sprintData.length}\n📈 Avg Completion: ${(sprintData.reduce((sum, sprint) => sum + parseFloat(sprint["Completion %"].replace('%', '')), 0) / sprintData.length).toFixed(1)}%\n\nView full report: ${shareUrl}`;
+                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                  }}
+                  fullWidth
+                >
+                  Share to WhatsApp
+                </Button>
+                <Button
+                  variant="contained"
+                  color="info"
+                  startIcon={<LinkedInIcon />}
+                  onClick={() => {
+                    const text = `🏃‍♂️ *Sprint Analysis Report*\n\n📋 *Board:* ${boardId}\n🎯 *Sprints:* ${sprintData.length}\n📈 *Avg Completion:* ${(sprintData.reduce((sum, sprint) => sum + parseFloat(sprint["Completion %"].replace('%', '')), 0) / sprintData.length).toFixed(1)}%\n\nView full report: ${shareUrl}`;
+                    navigator.clipboard.writeText(text);
+                    setSnackbarMessage('Slack message copied! Paste it in your Slack channel.');
+                    setSnackbarOpen(true);
+                  }}
+                  fullWidth
+                >
+                  Share to Slack
+                </Button>
+                <Button
+                  variant="contained"
+                  color="warning"
+                  startIcon={<EmailIcon />}
+                  onClick={() => {
+                    const subject = `Sprint Analysis Report - Board ${boardId}`;
+                    const body = `Hi,\n\nPlease find the sprint analysis report for Board ${boardId}.\n\nKey Highlights:\n• Total Sprints: ${sprintData.length}\n• Average Completion: ${(sprintData.reduce((sum, sprint) => sum + parseFloat(sprint["Completion %"].replace('%', '')), 0) / sprintData.length).toFixed(1)}%\n\nView full report: ${shareUrl}\n\nBest regards`;
+                    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                  }}
+                  fullWidth
+                >
+                  Share via Email
+                </Button>
+              </Box>
+            </Grid>
+
+            {/* Copy & Share Column */}
+            <Grid item xs={12} md={4}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+                Copy & Share
+              </Typography>
+              <Box display="flex" flexDirection="column" gap={1}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Format</InputLabel>
+                  <Select value="executive" label="Format">
+                    <MenuItem value="executive">Executive Summary</MenuItem>
+                    <MenuItem value="detailed">Detailed Report</MenuItem>
+                    <MenuItem value="brief">Brief Summary</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<ContentCopyIcon />}
+                  onClick={() => {
+                    const summary = `SPRINT REPORT SUMMARY\n\nBoard ID: ${boardId}\nAnalysis Date: ${new Date().toLocaleDateString()}\nSprints Analyzed: ${sprintData.length}\n\nKEY METRICS:\n• Average Completion Rate: ${(sprintData.reduce((sum, sprint) => sum + parseFloat(sprint["Completion %"].replace('%', '')), 0) / sprintData.length).toFixed(1)}%\n• Total Completed Issues: ${sprintData.reduce((sum, s) => sum + s["Completed"], 0)}\n• Total Issues Not Completed: ${sprintData.reduce((sum, s) => sum + s["Not Completed"], 0)}\n• Total Added During Sprint: ${sprintData.reduce((sum, s) => sum + s["Added During Sprint"], 0)}\n• Total Removed During Sprint: ${sprintData.reduce((sum, s) => sum + s["Removed During Sprint"], 0)}\n\nView full report: ${shareUrl}`;
+                    handleCopyToClipboard(summary);
+                  }}
+                  fullWidth
+                >
+                  Copy to Clipboard
+                </Button>
+                <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1, maxHeight: 200, overflow: 'auto' }}>
+                  <Typography variant="caption" color="text.secondary">
+                    SPRINT REPORT SUMMARY
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Board ID: {boardId}<br />
+                    Analysis Date: {new Date().toLocaleDateString()}<br />
+                    Sprints Analyzed: {sprintData.length}<br />
+                    <br />
+                    KEY METRICS:<br />
+                    • Average Completion Rate: {(sprintData.reduce((sum, sprint) => sum + parseFloat(sprint["Completion %"].replace('%', '')), 0) / sprintData.length).toFixed(1)}%<br />
+                    • Total Completed Issues: {sprintData.reduce((sum, s) => sum + s["Completed"], 0)}<br />
+                    • Total Issues Not Completed: {sprintData.reduce((sum, s) => sum + s["Not Completed"], 0)}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+          </Grid>
+
+          {/* Screenshot Preview */}
+          {capturedScreenshot && (
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+                Screenshot Preview
+              </Typography>
+              <Card>
+                <CardContent>
+                  <Box display="flex" justifyContent="center">
+                    <img 
+                      src={capturedScreenshot.dataUrl} 
+                      alt="Report Screenshot" 
+                      style={{ 
+                        maxWidth: '100%', 
+                        maxHeight: '300px', 
+                        border: '1px solid #ddd',
+                        borderRadius: '4px'
+                      }} 
+                    />
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+                    Screenshot captured successfully! Use the buttons above to share or download.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Box>
+          )}
+
+          {/* Share Link Section */}
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+              Share Link
+            </Typography>
+            <Box display="flex" alignItems="center" gap={1}>
+              <TextField
+                fullWidth
+                value={shareUrl}
+                variant="outlined"
+                size="small"
+                InputProps={{ readOnly: true }}
+              />
+              <IconButton onClick={() => handleCopyToClipboard(shareUrl)}>
+                <ContentCopyIcon />
+              </IconButton>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              This link will expire in 7 days.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #e0e0e0' }}>
+          <Button onClick={() => setShareDialogOpen(false)} variant="outlined">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* AI Insights Dialog */}
+      <Dialog open={aiInsightsDialogOpen} onClose={() => setAiInsightsDialogOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ 
+          borderBottom: '1px solid #e0e0e0', 
+          pb: 2,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 600, color: 'primary.main' }}>
+              AI-Powered Sprint Insights
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Powered by GPT-4 AI
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          {aiInsightsLoading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+              <CircularProgress />
+            </Box>
+          ) : aiInsights ? (
+            <Box>
+              {/* Overall Sprint Health Assessment */}
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main', mb: 2, component: 'div' }}>
+                Overall Sprint Health Assessment
+              </Typography>
+              <Card sx={{ mb: 3, backgroundColor: '#f8f9fa' }}>
+                <CardContent>
+                  <Typography variant="body1" sx={{ lineHeight: 1.6 }}>
+                    {aiInsights.overall_sprint_health_assessment || aiInsights.overall_assessment}
+                  </Typography>
+                </CardContent>
+              </Card>
+
+              {/* Actionable Recommendations */}
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main', mb: 2, component: 'div' }}>
+                Actionable Recommendations
+              </Typography>
+              {(aiInsights.actionable_recommendations || []).map((rec, index) => (
+                <Card key={index} sx={{ mb: 2, border: '1px solid #e0e0e0' }}>
+                  <CardContent>
+                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                        {rec.title}
+                      </Typography>
+                      <Box display="flex" gap={1}>
+                        <Chip 
+                          label={rec.category} 
+                          size="small" 
+                          color="primary" 
+                          variant="outlined"
+                        />
+                        <Chip 
+                          label={rec.severity} 
+                          size="small" 
+                          color={
+                            rec.severity === 'High' ? 'error' : 
+                            rec.severity === 'Medium' ? 'warning' : 'success'
+                          }
+                        />
+                      </Box>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+                      {rec.description}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {/* Key Observations */}
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main', mb: 2, component: 'div' }}>
+                Key Observations
+              </Typography>
+              <Card sx={{ mb: 3, backgroundColor: '#f8f9fa' }}>
+                <CardContent>
+                  <Box component="ul" sx={{ pl: 2, m: 0 }}>
+                    {(aiInsights.key_observations || []).map((observation, index) => (
+                      <Typography key={index} component="li" variant="body2" sx={{ mb: 1, lineHeight: 1.5 }}>
+                        {observation}
+                      </Typography>
+                    ))}
+                  </Box>
+                </CardContent>
+              </Card>
+
+              {aiInsights.fallback && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  Using enhanced analysis engine. For more advanced AI insights, configure OpenAI settings.
+                </Alert>
+              )}
+            </Box>
+          ) : (
+            <Typography>No insights available.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #e0e0e0' }}>
+          <Button onClick={() => setAiInsightsDialogOpen(false)} variant="outlined">
+            Close
+          </Button>
+          <Button 
+            onClick={handleAiInsights} 
+            variant="contained" 
+            startIcon={<RefreshIcon />}
+            disabled={aiInsightsLoading}
+          >
+            Regenerate Insights
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+      />
     </Box>
   );
 };

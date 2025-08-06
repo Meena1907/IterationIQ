@@ -225,13 +225,20 @@ def analyze_sprint(sprint, board_id=None):
                 
                 # Correct calculations
                 completed_count = len(completed_issues)
-                # If incompletedIssues is empty, use issuesNotCompletedInCurrentSprint as fallback
-                if len(incomplete_issues) == 0 and len(issues_not_completed_in_current_sprint) > 0:
-                    not_completed_count = len(issues_not_completed_in_current_sprint)
-                    print(f"DEBUG - Using issuesNotCompletedInCurrentSprint for not_completed_count")
+                # For closed sprints, calculate not completed as: issues planned at start - completed - removed + added
+                # This gives us the actual issues that were planned but not completed
+                if len(incomplete_issues) == 0:
+                    # If incompletedIssues is empty, calculate based on the formula
+                    # Not completed = issuesNotCompletedInCurrentSprint - issueKeysAddedDuringSprint
+                    # This gives us issues that were planned at start but not completed
+                    not_completed_count = len(issues_not_completed_in_current_sprint) - len(issue_keys_added_during_sprint)
+                    not_completed_count = max(0, not_completed_count)  # Ensure it's not negative
+                    print(f"DEBUG - Calculated not_completed_count: {not_completed_count} (issuesNotCompletedInCurrentSprint: {len(issues_not_completed_in_current_sprint)} - issueKeysAddedDuringSprint: {len(issue_keys_added_during_sprint)})")
                 else:
                     not_completed_count = len(incomplete_issues)
-                    print(f"DEBUG - Using incompletedIssues for not_completed_count")
+                    print(f"DEBUG - Using incompletedIssues for not_completed_count: {not_completed_count}")
+                
+                print(f"DEBUG - issuesNotCompletedInCurrentSprint count: {len(issues_not_completed_in_current_sprint)} (includes added issues)")
                 
                 added_during_sprint = len(issue_keys_added_during_sprint)
                 removed_during_sprint = len(punted_issues)
@@ -239,12 +246,167 @@ def analyze_sprint(sprint, board_id=None):
                 # Initial planned: issues present at sprint start
                 initial_planned = (completed_count + not_completed_count + removed_during_sprint) - added_during_sprint
                 
+                # Calculate story points by making separate API calls to get full issue details
+                initial_planned_sp = 0
+                completed_sp = 0
+                
+                # Get story points for completed issues
+                for issue in completed_issues:
+                    try:
+                        issue_key = issue.get('key')
+                        if not issue_key:
+                            continue
+                            
+                        # Make API call to get full issue details
+                        issue_url = f"{jira_url}/rest/api/2/issue/{issue_key}"
+                        issue_resp = requests.get(issue_url, headers=headers_obj, auth=auth_obj)
+                        if issue_resp.status_code == 200:
+                            issue_data = issue_resp.json()
+                            fields = issue_data.get('fields', {})
+                            
+                            # Try multiple possible story points field names
+                            story_points = 0
+                            possible_fields = [
+                                'customfield_10004',  # Common story points field
+                                'customfield_10016',  # Standard story points field
+                                'customfield_10008',  # Alternative story points field
+                                'storyPoints',        # Direct story points field
+                                'customfield_10026',  # Another common story points field
+                                'customfield_10020',  # Yet another possibility
+                                'customfield_10002',  # Additional common field
+                                'customfield_10003',  # Additional common field
+                                'customfield_10005',  # Additional common field
+                                'customfield_10006',  # Additional common field
+                                'customfield_10007',  # Additional common field
+                                'customfield_10009',  # Additional common field
+                                'customfield_10010',  # Additional common field
+                                'customfield_10011',  # Additional common field
+                                'customfield_10012',  # Additional common field
+                                'customfield_10013',  # Additional common field
+                                'customfield_10014',  # Additional common field
+                                'customfield_10015',  # Additional common field
+                                'customfield_10017',  # Additional common field
+                                'customfield_10018',  # Additional common field
+                                'customfield_10019',  # Additional common field
+                                'customfield_10021',  # Additional common field
+                                'customfield_10022',  # Additional common field
+                                'customfield_10023',  # Additional common field
+                                'customfield_10024',  # Additional common field
+                                'customfield_10025',  # Additional common field
+                                'customfield_10027',  # Additional common field
+                                'customfield_10028',  # Additional common field
+                                'customfield_10029',  # Additional common field
+                                'customfield_10030',  # Additional common field
+                            ]
+                            
+                            for field_name in possible_fields:
+                                if field_name in fields and fields[field_name] is not None:
+                                    story_points = fields[field_name]
+                                    # Check if it's a numeric value (not a list or object)
+                                    if isinstance(story_points, (int, float)) and story_points > 0:
+                                        print(f"DEBUG: Found story points value: {story_points} for {issue_key} in field {field_name}")
+                                        break
+                                    else:
+                                        print(f"DEBUG: Field {field_name} contains non-numeric value: {story_points} for {issue_key}")
+                                        story_points = 0
+                                else:
+                                    story_points = 0
+                            
+                            completed_sp += story_points
+                    except Exception as e:
+                        print(f"DEBUG: Error processing story points for completed issue {issue.get('key', 'unknown')}: {str(e)}")
+                        continue
+                
+                # Get story points for incomplete issues
+                for issue in incomplete_issues:
+                    try:
+                        issue_key = issue.get('key')
+                        if not issue_key:
+                            continue
+                            
+                        # Make API call to get full issue details
+                        issue_url = f"{jira_url}/rest/api/2/issue/{issue_key}"
+                        issue_resp = requests.get(issue_url, headers=headers_obj, auth=auth_obj)
+                        if issue_resp.status_code == 200:
+                            issue_data = issue_resp.json()
+                            fields = issue_data.get('fields', {})
+                            
+                            # Try multiple possible story points field names
+                            story_points = 0
+                            possible_fields = [
+                                'customfield_10004',  # Common story points field
+                                'customfield_10016',  # Standard story points field
+                                'customfield_10008',  # Alternative story points field
+                                'storyPoints',        # Direct story points field
+                                'customfield_10026',  # Another common story points field
+                                'customfield_10020',  # Yet another possibility
+                                'customfield_10002',  # Additional common field
+                                'customfield_10003',  # Additional common field
+                                'customfield_10005',  # Additional common field
+                                'customfield_10006',  # Additional common field
+                                'customfield_10007',  # Additional common field
+                                'customfield_10009',  # Additional common field
+                                'customfield_10010',  # Additional common field
+                                'customfield_10011',  # Additional common field
+                                'customfield_10012',  # Additional common field
+                                'customfield_10013',  # Additional common field
+                                'customfield_10014',  # Additional common field
+                                'customfield_10015',  # Additional common field
+                                'customfield_10017',  # Additional common field
+                                'customfield_10018',  # Additional common field
+                                'customfield_10019',  # Additional common field
+                                'customfield_10021',  # Additional common field
+                                'customfield_10022',  # Additional common field
+                                'customfield_10023',  # Additional common field
+                                'customfield_10024',  # Additional common field
+                                'customfield_10025',  # Additional common field
+                                'customfield_10027',  # Additional common field
+                                'customfield_10028',  # Additional common field
+                                'customfield_10029',  # Additional common field
+                                'customfield_10030',  # Additional common field
+                            ]
+                            
+                            for field_name in possible_fields:
+                                if field_name in fields and fields[field_name] is not None:
+                                    story_points = fields[field_name]
+                                    # Check if it's a numeric value (not a list or object)
+                                    if isinstance(story_points, (int, float)) and story_points > 0:
+                                        print(f"DEBUG: Found story points value: {story_points} for {issue_key} in field {field_name}")
+                                        break
+                                    else:
+                                        print(f"DEBUG: Field {field_name} contains non-numeric value: {story_points} for {issue_key}")
+                                        story_points = 0
+                                else:
+                                    story_points = 0
+                            
+                            initial_planned_sp += story_points
+                    except Exception as e:
+                        print(f"DEBUG: Error processing story points for incomplete issue {issue.get('key', 'unknown')}: {str(e)}")
+                        continue
+                
+                # Add story points from completed issues to initial planned (they were planned at start)
+                initial_planned_sp += completed_sp
+                
                 print(f"Using sprint report API:")
                 print(f"Initial Planned: {initial_planned}")
                 print(f"Completed: {completed_count}")
                 print(f"Not Completed: {not_completed_count}")
                 print(f"Added during sprint: {added_during_sprint}")
                 print(f"Removed during sprint: {removed_during_sprint}")
+                print(f"Initial Planned SP: {initial_planned_sp}")
+                print(f"Completed SP: {completed_sp}")
+                
+                # Debug: Show available fields for first issue to help identify story points field
+                if completed_issues:
+                    first_issue = completed_issues[0]
+                    fields = first_issue.get('fields', {})
+                    print(f"DEBUG: Available fields in first completed issue:")
+                    try:
+                        for field_name, field_value in fields.items():
+                            if 'story' in field_name.lower() or 'point' in field_name.lower() or 'customfield' in field_name.lower():
+                                print(f"  {field_name}: {field_value}")
+                    except Exception as e:
+                        print(f"DEBUG: Error processing fields: {str(e)}")
                 
             else:
                 raise Exception("Sprint report API failed, falling back to issue API")
@@ -270,6 +432,9 @@ def analyze_sprint(sprint, board_id=None):
             not_completed_count = 0
             added_during_sprint = 0
             removed_during_sprint = 0
+            initial_planned_sp = 0
+            completed_sp = 0
+            initial_planned = 0  # Initialize initial_planned for fallback case
             
             sprint_start_dt = parser.parse(start_date) if start_date != "N/A" else None
             sprint_end_dt = parser.parse(end_date) if end_date != "N/A" else None
@@ -283,14 +448,67 @@ def analyze_sprint(sprint, board_id=None):
                     # For closed sprints, use current status as approximation
                     # (This is less accurate but better than nothing)
                     status = issue.get("fields", {}).get("status", {}).get("name", "").lower()
+                    
+                    # Try multiple possible story points field names
+                    story_points = 0
+                    fields = issue.get("fields", {})
+                    
+                    # Common story points field names
+                    possible_fields = [
+                        'customfield_10004',  # Common story points field
+                        'customfield_10016',  # Standard story points field
+                        'customfield_10008',  # Alternative story points field
+                        'storyPoints',        # Direct story points field
+                        'customfield_10026',  # Another common story points field
+                        'customfield_10020',  # Yet another possibility
+                        'customfield_10002',  # Additional common field
+                        'customfield_10003',  # Additional common field
+                        'customfield_10005',  # Additional common field
+                        'customfield_10006',  # Additional common field
+                        'customfield_10007',  # Additional common field
+                        'customfield_10009',  # Additional common field
+                        'customfield_10010',  # Additional common field
+                        'customfield_10011',  # Additional common field
+                        'customfield_10012',  # Additional common field
+                        'customfield_10013',  # Additional common field
+                        'customfield_10014',  # Additional common field
+                        'customfield_10015',  # Additional common field
+                        'customfield_10017',  # Additional common field
+                        'customfield_10018',  # Additional common field
+                        'customfield_10019',  # Additional common field
+                        'customfield_10021',  # Additional common field
+                        'customfield_10022',  # Additional common field
+                        'customfield_10023',  # Additional common field
+                        'customfield_10024',  # Additional common field
+                        'customfield_10025',  # Additional common field
+                        'customfield_10027',  # Additional common field
+                        'customfield_10028',  # Additional common field
+                        'customfield_10029',  # Additional common field
+                        'customfield_10030',  # Additional common field
+                    ]
+                    
+                    for field_name in possible_fields:
+                        if field_name in fields and fields[field_name] is not None:
+                            story_points = fields[field_name]
+                            print(f"DEBUG: Found story points {story_points} for {issue_key} in field {field_name} (fallback)")
+                            break
+                    
                     if status in ["done", "closed", "resolved"]:
                         completed_count += 1
+                        completed_sp += story_points
                     else:
                         not_completed_count += 1
+                        initial_planned_sp += story_points
                         
                 except Exception as e:
                     print(f"Error processing issue {issue.get('key', 'unknown')}: {str(e)}")
                     continue
+            
+            # Add completed story points to initial planned (they were planned at start)
+            initial_planned_sp += completed_sp
+            
+            # Calculate initial planned count for fallback case
+            initial_planned = completed_count + not_completed_count
         
         total_planned = completed_count + not_completed_count
         completion_pct = f"{(completed_count / total_planned * 100):.1f}%" if total_planned > 0 else "N/A"
@@ -313,6 +531,8 @@ def analyze_sprint(sprint, board_id=None):
             "Not Completed": not_completed_count,
             "Added During Sprint": added_during_sprint,
             "Removed During Sprint": removed_during_sprint,
+            "Initial Planned SP": initial_planned_sp,
+            "Completed SP": completed_sp,
             "Completion %": completion_pct,
             "Insight": insight
         }

@@ -1464,6 +1464,8 @@ def api_jira_sprint_report_stream():
             # Take the top 15 most recent closed sprints
             top_15_closed_sprints = closed_sprints[:15]
             
+
+            
             # Send progress update
             yield f"data: {json.dumps({'type': 'progress', 'message': f'Found {len(top_15_closed_sprints)} sprints to analyze'})}\n\n"
             
@@ -1495,6 +1497,55 @@ def api_jira_sprint_report_stream():
             'Access-Control-Allow-Origin': '*'
         }
     )
+
+@app.route('/api/sprint/export-csv', methods=['POST'])
+def export_sprint_report_csv():
+    """Export sprint report data as CSV"""
+    try:
+        data = request.get_json()
+        sprint_data = data.get('sprint_data', [])
+        board_id = data.get('board_id', '')
+        
+        if not sprint_data:
+            return jsonify({'error': 'No sprint data provided'}), 400
+        
+        # Create CSV content
+        output = io.StringIO()
+        
+        # Write header information
+        output.write(f"Sprint Report - Board {board_id}\n")
+        output.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        output.write(f"Total Sprints: {len(sprint_data)}\n")
+        output.write("\n")
+        
+        # Write sprint data
+        if sprint_data:
+            # Get headers from first sprint
+            headers = list(sprint_data[0].keys())
+            output.write(','.join(headers) + '\n')
+            
+            for sprint in sprint_data:
+                row = []
+                for header in headers:
+                    value = sprint.get(header, '')
+                    # Escape commas and quotes in CSV
+                    if isinstance(value, str) and (',' in value or '"' in value):
+                        value = '"' + value.replace('"', '""') + '"'
+                    row.append(str(value))
+                output.write(','.join(row) + '\n')
+        
+        csv_content = output.getvalue()
+        output.close()
+        
+        # Create response with CSV file
+        response = Response(csv_content, mimetype='text/csv')
+        response.headers['Content-Disposition'] = f'attachment; filename=sprint_report_board_{board_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error exporting sprint report CSV: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/capacity/analyze', methods=['POST'])
 def start_capacity_analysis():
@@ -1927,11 +1978,163 @@ def analyze_sprint_report_data(sprint_data):
     recommendations.append("🗣️ Maintain regular retrospectives focused on actionable improvements")
     recommendations.append("📈 Continue monitoring velocity trends and completion patterns for early issue detection")
     
+    # Analyze sprint patterns for more intelligent insights using actual completion percentages
+    zero_completion_sprints = 0
+    high_completion_sprints = 0
+    low_completion_sprints = 0
+    
+    for sprint in sprint_data:
+        # Get completion percentage from the sprint data
+        completion_pct_str = sprint.get('Completion %', '0%')
+        # Remove % and convert to float
+        completion_pct = float(completion_pct_str.replace('%', '')) if completion_pct_str else 0
+        
+        if completion_pct == 0:
+            zero_completion_sprints += 1
+        elif completion_pct >= 100:
+            high_completion_sprints += 1
+        elif completion_pct < 50:
+            low_completion_sprints += 1
+    
+    # Calculate velocity consistency
+    velocities = [v['velocity'] for v in velocity_data]
+    velocity_variance = max(velocities) - min(velocities) if velocities else 0
+    
+    # Analyze scope changes
+    total_added = sum(sprint.get('Added During Sprint', 0) for sprint in sprint_data)
+    total_removed = sum(sprint.get('Removed During Sprint', 0) for sprint in sprint_data)
+    scope_change_rate = ((total_added + total_removed) / total_committed * 100) if total_committed > 0 else 0
+    
+    # Format recommendations with categories and severity levels
+    actionable_recommendations = []
+    
+    # Generate data-driven actionable recommendations
+    
+    # Zero completion sprints analysis
+    if zero_completion_sprints > 0:
+        actionable_recommendations.append({
+            'title': 'Address Zero Completion Sprints',
+            'description': f'{zero_completion_sprints} sprints had zero completion, indicating fundamental issues with sprint commitment or execution. Review sprint planning process and team capacity assessment.',
+            'category': 'Planning',
+            'severity': 'High'
+        })
+    
+    # Velocity consistency issues
+    if velocity_variance > 50:
+        actionable_recommendations.append({
+            'title': 'Improve Velocity Consistency',
+            'description': f'High velocity variance ({velocity_variance:.1f}%) suggests inconsistent estimation or execution. Implement standardized estimation techniques and track velocity trends.',
+            'category': 'Process',
+            'severity': 'Medium'
+        })
+    
+    # Scope change management
+    if scope_change_rate > 20:
+        actionable_recommendations.append({
+            'title': 'Manage Scope Changes',
+            'description': f'High scope change rate ({scope_change_rate:.1f}%) impacts delivery predictability. Implement sprint commitment protection and stakeholder communication protocols.',
+            'category': 'Execution',
+            'severity': 'Medium'
+        })
+    
+    # Low completion rate issues
+    if overall_completion_rate < 60:
+        actionable_recommendations.append({
+            'title': 'Improve Sprint Execution',
+            'description': f'Low completion rate ({overall_completion_rate:.1f}%) indicates execution challenges. Conduct root cause analysis and implement daily progress tracking.',
+            'category': 'Execution',
+            'severity': 'High'
+        })
+        actionable_recommendations.append({
+            'title': 'Optimize Sprint Planning',
+            'description': 'Reduce sprint scope by 30-50% to rebuild team confidence and improve completion rates. Use historical velocity data for realistic commitments.',
+            'category': 'Planning',
+            'severity': 'High'
+        })
+    
+    # Team capacity issues
+    if avg_velocity < 50:
+        actionable_recommendations.append({
+            'title': 'Assess Team Capacity',
+            'description': f'Low average velocity ({avg_velocity:.1f}%) suggests capacity or productivity issues. Conduct team health assessment and workload rebalancing.',
+            'category': 'Team',
+            'severity': 'Medium'
+        })
+    
+    # Positive trends
+    if len(velocity_data) >= 3:
+        recent_avg = sum([v['velocity'] for v in velocity_data[-3:]]) / 3
+        earlier_avg = sum([v['velocity'] for v in velocity_data[:-3]]) / (len(velocity_data) - 3) if len(velocity_data) > 3 else recent_avg
+        trend = recent_avg - earlier_avg
+        if trend > 10:
+            actionable_recommendations.append({
+                'title': 'Leverage Positive Trends',
+                'description': f'Recent sprints show {trend:.1f}% improvement. Document successful practices and consider gradually increasing sprint commitments.',
+                'category': 'Process',
+                'severity': 'Low'
+            })
+        elif trend < -10:
+            actionable_recommendations.append({
+                'title': 'Address Declining Performance',
+                'description': f'Recent sprints show {abs(trend):.1f}% decline. Investigate team changes, technical debt, or external factors affecting performance.',
+                'category': 'Team',
+                'severity': 'High'
+            })
+    
+    # If no specific issues found, provide general improvement recommendations
+    if not actionable_recommendations:
+        actionable_recommendations.append({
+            'title': 'Continuous Improvement',
+            'description': 'Maintain current performance levels while implementing regular retrospectives and monitoring velocity trends for early issue detection.',
+            'category': 'Process',
+            'severity': 'Low'
+        })
+    
+    # Generate intelligent overall assessment based on actual completion percentages
+    if zero_completion_sprints > 0 and zero_completion_sprints >= total_sprints * 0.7:
+        overall_assessment = f"The team has shown significant challenges in sprint performance over the last {total_sprints} sprints, with {zero_completion_sprints} out of {total_sprints} sprints recording zero completion. This indicates systemic issues in the workflow. The team's planning and execution appear to be misaligned, resulting in ineffective use of sprint time."
+    elif high_completion_sprints >= 2 and high_completion_sprints >= total_sprints * 0.3:
+        overall_assessment = f"The team demonstrates mixed sprint performance over the last {total_sprints} sprints. {high_completion_sprints} sprints achieved 100% or higher completion, showing good execution capability when conditions are right. However, {low_completion_sprints} sprints had completion rates below 50%, indicating inconsistent execution patterns that need attention."
+    elif high_completion_sprints >= 1:
+        overall_assessment = f"The team shows potential for good sprint performance with {high_completion_sprints} sprint(s) achieving 100% or higher completion out of {total_sprints} total sprints. However, {low_completion_sprints} sprints had completion rates below 50%, suggesting the need for process optimization and better sprint planning."
+    else:
+        overall_assessment = f"The team's sprint performance shows room for improvement across {total_sprints} sprints. {low_completion_sprints} sprints had completion rates below 50%, indicating execution challenges. Focus on improving sprint planning and execution consistency."
+
+    # Generate intelligent key observations based on actual data
+    key_observations = []
+    
+    if high_completion_sprints > 0:
+        key_observations.append(f"{high_completion_sprints} out of {total_sprints} sprints achieved 100% or higher completion, showing the team can deliver successfully when conditions are right.")
+    
+    if zero_completion_sprints > 0:
+        key_observations.append(f"{zero_completion_sprints} out of {total_sprints} sprints recorded zero completion, indicating potential systemic workflow issues.")
+    
+    if low_completion_sprints > 0:
+        key_observations.append(f"{low_completion_sprints} sprints had completion rates below 50%, suggesting inconsistent execution patterns.")
+    
+    if velocity_variance > 50:
+        key_observations.append(f"High velocity variance ({velocity_variance:.1f}%) suggests inconsistent estimation or execution patterns.")
+    
+    if scope_change_rate > 20:
+        key_observations.append(f"High scope change rate ({scope_change_rate:.1f}%) indicates frequent mid-sprint adjustments that may impact delivery predictability.")
+    
+    # Add trend analysis if we have enough data
+    if len(velocity_data) >= 3:
+        recent_avg = sum([v['velocity'] for v in velocity_data[-3:]]) / 3
+        earlier_avg = sum([v['velocity'] for v in velocity_data[:-3]]) / (len(velocity_data) - 3) if len(velocity_data) > 3 else recent_avg
+        trend = recent_avg - earlier_avg
+        if trend > 10:
+            key_observations.append(f"Positive velocity trend: recent sprints show {trend:.1f}% improvement over earlier performance.")
+        elif trend < -10:
+            key_observations.append(f"Declining velocity trend: recent sprints show {abs(trend):.1f}% decrease from earlier performance.")
+    
+    if not key_observations:
+        key_observations.append(f"Analysis of {total_sprints} sprints shows mixed performance patterns with opportunities for improvement.")
+
     return {
-        'overall_assessment': f"Analysis of {total_sprints} sprint(s) shows {overall_completion_rate:.1f}% completion rate with {avg_velocity:.1f}% average velocity.",
-        'insights': insights,
+        'overall_sprint_health_assessment': overall_assessment,
+        'actionable_recommendations': actionable_recommendations,
         'key_observations': key_observations,
-        'recommendations': recommendations,
         'fallback': True
     }
 
