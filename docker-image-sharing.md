@@ -1,7 +1,7 @@
 # 🚀 Sharing Docker Images for Hosting - Complete Guide
 
 ## 📋 Overview
-This guide covers all the methods to share your Jira Hub Docker image for hosting and deployment across different platforms and environments.
+This guide covers all the methods to share your Spark Docker image for hosting and deployment across different platforms and environments.
 
 ---
 
@@ -387,4 +387,4 @@ gcloud run deploy jira-hub --image gcr.io/PROJECT_ID/jira-hub:latest --platform 
 - **Azure ACR**: [ACR Documentation](https://docs.microsoft.com/en-us/azure/container-registry/)
 - **GitHub GHCR**: [GHCR Documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
 
-Your Jira Hub application is now ready to be shared and deployed anywhere! 🚀🌍 
+Your Spark application is now ready to be shared and deployed anywhere! 🚀🌍 

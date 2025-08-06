@@ -5,20 +5,54 @@ from datetime import datetime, timedelta
 import json
 from collections import defaultdict
 import statistics
+import os
+import sys
 
-# --- CONFIGURATION ---
-JIRA_URL = "https://thoughtspot.atlassian.net"  # <-- Replace with your Jira URL
-EMAIL = "meena.singh@thoughtspot.com"                # <-- Replace with your Jira email
-API_TOKEN = "ATATT3xFfGF0JszDBw4GIFkxCtqvSpztaOKsZQtNhSdMfUProZGCtlnx4iCidWqeUQTHBYdfpfyDdHMFaUbEeuCjvCjiLYfoL0IZOlf1F3E8Tqo-QNa7h7CS6M_syvuKXxmqmQfXCTs7hV7dR5L1iag-hqT0yI0XorBghQP9R_K8HveJshcvWag=23A6771A"                    # <-- Replace with your Jira API token
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-auth = HTTPBasicAuth(EMAIL, API_TOKEN)
-headers = {"Accept": "application/json"}
+try:
+    from settings_manager import settings_manager
+except ImportError:
+    # Fallback for direct execution - try to load from env
+    from dotenv import load_dotenv
+    load_dotenv()
+    settings_manager = None
+
+def get_jira_credentials():
+    """Get JIRA credentials from settings manager or environment variables"""
+    if settings_manager and settings_manager.has_valid_credentials():
+        credentials = settings_manager.get_jira_credentials()
+        if credentials and all([credentials.get('url'), credentials.get('email'), credentials.get('api_token')]):
+            return credentials
+    
+    # Fallback to environment variables
+    return {
+        'url': os.getenv('JIRA_URL'),
+        'email': os.getenv('JIRA_EMAIL'),
+        'api_token': os.getenv('JIRA_API_TOKEN')
+    }
+
+def get_auth_and_headers():
+    """Get authentication and headers for JIRA API calls"""
+    credentials = get_jira_credentials()
+    
+    if not credentials or not all([credentials.get('url'), credentials.get('email'), credentials.get('api_token')]):
+        raise ValueError("JIRA credentials not configured. Please configure them in Settings.")
+    
+    auth = HTTPBasicAuth(credentials['email'], credentials['api_token'])
+    headers = {"Accept": "application/json"}
+    
+    return credentials['url'], auth, headers
 
 def get_user_issues(user_email, weeks_back=8):
     """
     Fetch ALL issues assigned to or worked on by a specific user in the last N weeks
     """
     try:
+        # Get Jira credentials and authentication
+        jira_url, auth, headers = get_auth_and_headers()
+        
         # Calculate date range
         end_date = datetime.now()
         start_date = end_date - timedelta(weeks=weeks_back)
@@ -32,7 +66,7 @@ def get_user_issues(user_email, weeks_back=8):
         updated >= "{start_date_str}"
         '''
         
-        url = f"{JIRA_URL}/rest/api/2/search"
+        url = f"{jira_url}/rest/api/2/search"
         params = {
             "jql": jql,
             "maxResults": 100,  # Keep batch size at 100 for API efficiency
@@ -262,37 +296,8 @@ def generate_recommendations(metrics, weekly_data):
     
     return {
         'insights': insights,
-        'recommendations': recommendations,
-        'overall_rating': calculate_overall_rating(metrics)
+        'recommendations': recommendations
     }
-
-def calculate_overall_rating(metrics):
-    """
-    Calculate overall performance rating
-    """
-    score = 0
-    
-    # Completion rate (40% weight)
-    completion_rate = metrics.get('completion_rate', 0)
-    score += completion_rate * 40
-    
-    # Consistency (30% weight)
-    consistency = metrics.get('completion_consistency', 0)
-    score += consistency * 30
-    
-    # Productivity (30% weight)
-    avg_completed = metrics.get('avg_completed_per_week', 0)
-    productivity_score = min(avg_completed / 5, 1)  # Normalize to 0-1 scale
-    score += productivity_score * 30
-    
-    if score >= 80:
-        return "🌟 Excellent"
-    elif score >= 65:
-        return "✅ Good"
-    elif score >= 50:
-        return "⚠️ Average"
-    else:
-        return "❌ Needs Improvement"
 
 def analyze_user_capacity(user_email, weeks_back=8):
     """
@@ -340,7 +345,10 @@ def analyze_user_capacity(user_email, weeks_back=8):
     # URL encode the JQL query
     import urllib.parse
     encoded_jql = urllib.parse.quote(jql_query)
-    jira_link = f"{JIRA_URL}/issues/?jql={encoded_jql}"
+    
+    # Get Jira URL from credentials
+    jira_url, _, _ = get_auth_and_headers()
+    jira_link = f"{jira_url}/issues/?jql={encoded_jql}"
     
     return {
         'user_email': user_email,
@@ -349,7 +357,6 @@ def analyze_user_capacity(user_email, weeks_back=8):
         'weekly_summary': weekly_summary,
         'insights': recommendations['insights'],
         'recommendations': recommendations['recommendations'],
-        'overall_rating': recommendations['overall_rating'],
         'total_issues_analyzed': len(issues),
         'issue_breakdown': issue_breakdown,
         'jira_link': jira_link,
@@ -418,7 +425,6 @@ if __name__ == "__main__":
     else:
         print(f"\n📊 Capacity Analysis for {result['user_email']}")
         print(f"📅 Period: {result['analysis_period']}")
-        print(f"📈 Overall Rating: {result['overall_rating']}")
         print(f"📊 Total Issues Analyzed: {result['total_issues_analyzed']}")
         print(f"🔗 View Issues in JIRA: {result['jira_link']}")
         print(f"📝 JQL Query: {result['jql_query']}")

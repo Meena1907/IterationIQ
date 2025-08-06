@@ -1,11 +1,11 @@
 ================================================================================
-                    🐳 JIRA HUB - DOCKER DEPLOYMENT GUIDE
+                    🐳 SPARK - DOCKER DEPLOYMENT GUIDE
 ================================================================================
 
 📋 OVERVIEW
 -----------
 This guide contains complete instructions for containerizing and deploying your 
-Jira Hub application using Docker. The application is a Flask-based web app that 
+Spark application using Docker. The application is a Flask-based web app that 
 provides Jira analytics, sprint reporting, and capacity planning features.
 
 🏗️ DOCKER SETUP FILES CREATED
@@ -31,7 +31,7 @@ provides Jira analytics, sprint reporting, and capacity planning features.
 ---------------------
 1. Go to: https://id.atlassian.com/manage-profile/security/api-tokens
 2. Click "Create API token"
-3. Give it a name (e.g., "Jira Hub App")
+3. Give it a name (e.g., "Spark App")
 4. Copy the generated token (you won't see it again!)
 
 ================================================================================
@@ -455,7 +455,7 @@ Container memory usage: ~50-100MB (typical Flask app)
                               🎉 SUCCESS!
 ================================================================================
 
-Your Jira Hub application is now fully containerized and ready for deployment!
+Your Spark application is now fully containerized and ready for deployment!
 
 Key benefits of this Docker setup:
 ✅ Production-ready configuration

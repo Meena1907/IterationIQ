@@ -4,35 +4,81 @@ from dateutil import parser
 from datetime import datetime
 import json
 import time
+import os
+import sys
+
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from settings_manager import settings_manager
+except ImportError:
+    # Fallback for direct execution - try to load from env
+    from dotenv import load_dotenv
+    load_dotenv()
+    settings_manager = None
 
 # --- CONFIGURATION ---
-JIRA_URL = "https://thoughtspot.atlassian.net"  # <-- Replace with your Jira URL
-EMAIL = "meena.singh@thoughtspot.com"                # <-- Replace with your Jira email
-API_TOKEN = "ATATT3xFfGF0JszDBw4GIFkxCtqvSpztaOKsZQtNhSdMfUProZGCtlnx4iCidWqeUQTHBYdfpfyDdHMFaUbEeuCjvCjiLYfoL0IZOlf1F3E8Tqo-QNa7h7CS6M_syvuKXxmqmQfXCTs7hV7dR5L1iag-hqT0yI0XorBghQP9R_K8HveJshcvWag=23A6771A"                    # <-- Replace with your Jira API token
 SPRINT_FIELD_ID = "customfield_10020"
 DONE_STATUSES = {"CANCELLED", "DUPLICATE", "RESOLVED", "CLOSED"}
 
-auth = HTTPBasicAuth(EMAIL, API_TOKEN)
-headers = {"Accept": "application/json"}
+def get_jira_credentials():
+    """Get JIRA credentials from settings or environment variables"""
+    if settings_manager:
+        credentials = settings_manager.get_jira_credentials()
+        if credentials and all([credentials.get('url'), credentials.get('email'), credentials.get('api_token')]):
+            return credentials
+    
+    # Fallback to environment variables
+    return {
+        'url': os.getenv('JIRA_URL'),
+        'email': os.getenv('JIRA_EMAIL'),
+        'api_token': os.getenv('JIRA_API_TOKEN')
+    }
+
+def get_auth_and_headers():
+    """Get authentication and headers for JIRA API calls"""
+    credentials = get_jira_credentials()
+    
+    if not credentials or not all([credentials.get('url'), credentials.get('email'), credentials.get('api_token')]):
+        raise ValueError("JIRA credentials not configured. Please configure them in Settings.")
+    
+    auth = HTTPBasicAuth(credentials['email'], credentials['api_token'])
+    headers = {"Accept": "application/json"}
+    
+    return credentials['url'], auth, headers
+
+# Get initial credentials
+try:
+    JIRA_URL, auth, headers = get_auth_and_headers()
+except ValueError as e:
+    print(f"Warning: {str(e)}")
+    JIRA_URL = auth = headers = None
 
 def get_board_id(board_name):
-    url = f"{JIRA_URL}/rest/agile/1.0/board"
-    params = {"name": board_name}
-    resp = requests.get(url, headers=headers, auth=auth, params=params)
-    resp.raise_for_status()
-    data = resp.json()
-    if data.get("values"):
-        return data["values"][0]["id"]
-    return None
+    try:
+        jira_url, auth_obj, headers_obj = get_auth_and_headers()
+        url = f"{jira_url}/rest/agile/1.0/board"
+        params = {"name": board_name}
+        resp = requests.get(url, headers=headers_obj, auth=auth_obj, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("values"):
+            return data["values"][0]["id"]
+        return None
+    except ValueError as e:
+        print(f"Error: {str(e)}")
+        return None
 
 def get_sprints_for_board(board_id):
     try:
-        url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint"
+        jira_url, auth_obj, headers_obj = get_auth_and_headers()
+        url = f"{jira_url}/rest/agile/1.0/board/{board_id}/sprint"
         params = {
-            "maxResults": 5  # Get more sprints to ensure we have enough
+            "maxResults": 15  # Get more sprints to ensure we have enough
         }
         print(f"\nFetching sprints for board {board_id}")
-        resp = requests.get(url, headers=headers, auth=auth, params=params)
+        resp = requests.get(url, headers=headers_obj, auth=auth_obj, params=params)
         resp.raise_for_status()
         data = resp.json()
         all_sprints = data.get("values", [])
@@ -53,7 +99,7 @@ def get_sprints_for_board(board_id):
         # Sort closed sprints by end date (newest first)
         closed_sprints.sort(key=lambda x: x.get("endDate", ""), reverse=True)
         
-        # If there are active sprints, get last 5 closed sprints for each active sprint
+        # If there are active sprints, get last 15 closed sprints for each active sprint
         if active_sprints:
             result_sprints = []
             for active_sprint in active_sprints:
@@ -67,8 +113,8 @@ def get_sprints_for_board(board_id):
                     relevant_closed = [s for s in closed_sprints if s.get("endDate") < active_start_date]
                     print(f"Found {len(relevant_closed)} closed sprints before this active sprint")
                     
-                    # Take last 5 sprints for this active sprint
-                    sprints_to_add = relevant_closed[:5]
+                    # Take last 15 sprints for this active sprint
+                    sprints_to_add = relevant_closed[:15]
                     print(f"Adding {len(sprints_to_add)} closed sprints to report")
                     for sprint in sprints_to_add:
                         print(f"- {sprint.get('name')} (ended: {sprint.get('endDate')})")
@@ -87,23 +133,28 @@ def get_sprints_for_board(board_id):
             print(f"\nFinal report will contain {len(result_sprints)} sprints")
             return result_sprints
         else:
-            # If no active sprints, just return last 5 closed sprints
-            print("\nNo active sprints found, returning last 5 closed sprints")
-            return closed_sprints[:5]
+            # If no active sprints, just return last 15 closed sprints
+            print("\nNo active sprints found, returning last 15 closed sprints")
+            return closed_sprints[:15]
             
     except Exception as e:
         print(f"Error fetching sprints: {str(e)}")
         return []
 
 def get_sprint_report(board_id, sprint_id):
-    url = f"{JIRA_URL}/rest/greenhopper/1.0/rapid/charts/sprintreport"
-    params = {
-        "rapidViewId": board_id,
-        "sprintId": sprint_id
-    }
-    resp = requests.get(url, headers=headers, auth=auth, params=params)
-    resp.raise_for_status()
-    return resp.json()
+    try:
+        jira_url, auth_obj, headers_obj = get_auth_and_headers()
+        url = f"{jira_url}/rest/greenhopper/1.0/rapid/charts/sprintreport"
+        params = {
+            "rapidViewId": board_id,
+            "sprintId": sprint_id
+        }
+        resp = requests.get(url, headers=headers_obj, auth=auth_obj, params=params)
+        resp.raise_for_status()
+        return resp.json()
+    except ValueError as e:
+        print(f"Error: {str(e)}")
+        return None
 
 def generate_insight(completed, not_completed, scope_change, total_planned):
     completion_rate = (completed / total_planned * 100) if total_planned > 0 else 0
@@ -148,10 +199,11 @@ def analyze_sprint(sprint, board_id=None):
         
         # Get all issues in the sprint using the sprint report API (more accurate)
         try:
+            jira_url, auth_obj, headers_obj = get_auth_and_headers()
             # Try to get sprint report first (more accurate for closed sprints)
-            sprint_report_url = f"{JIRA_URL}/rest/greenhopper/1.0/rapid/charts/sprintreport"
+            sprint_report_url = f"{jira_url}/rest/greenhopper/1.0/rapid/charts/sprintreport"
             params = {"rapidViewId": board_id or "2008", "sprintId": sprint_id}
-            sprint_report_resp = requests.get(sprint_report_url, headers=headers, auth=auth, params=params)
+            sprint_report_resp = requests.get(sprint_report_url, headers=headers_obj, auth=auth_obj, params=params)
             
             if sprint_report_resp.status_code == 200:
                 sprint_report = sprint_report_resp.json()
@@ -200,9 +252,14 @@ def analyze_sprint(sprint, board_id=None):
         except Exception as e:
             print(f"Sprint report API failed: {str(e)}, using fallback method")
             
-            # Fallback: Get all issues in the sprint
-            issues_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=100"
-            issues_resp = requests.get(issues_url, headers=headers, auth=auth)
+            try:
+                jira_url, auth_obj, headers_obj = get_auth_and_headers()
+                # Fallback: Get all issues in the sprint
+                issues_url = f"{jira_url}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=100"
+                issues_resp = requests.get(issues_url, headers=headers_obj, auth=auth_obj)
+            except ValueError as cred_error:
+                print(f"Credentials error in fallback: {str(cred_error)}")
+                return None
             issues_resp.raise_for_status()
             issues_data = issues_resp.json()
             issues = issues_data.get("issues", [])
@@ -265,7 +322,7 @@ def analyze_sprint(sprint, board_id=None):
 
 def generate_jira_sprint_report(board_id):
     """
-    Returns a list of dicts, one per sprint (last 5 sprints for each active sprint)
+    Returns a list of dicts, one per sprint (last 15 sprints for each active sprint)
     """
     try:
         report = []
@@ -290,7 +347,7 @@ def generate_jira_sprint_report(board_id):
 if __name__ == "__main__":
     BOARD_ID = "1697"  # Default for CLI usage
     report = generate_jira_sprint_report(BOARD_ID)
-    print("\nSprint Report Summary (Last 5 Sprints for Each Active Sprint):")
+    print("\nSprint Report Summary (Last 15 Sprints for Each Active Sprint):")
     print(f"{'Sprint Name':<30} {'Start':<12} {'End':<12} {'Status':<10} {'Initial Planned':<20} {'Completed':<10} {'Not Completed':<15} {'Added':<10} {'Removed':<10} {'Completion %':<12} {'Insight':<40}")
     print("-" * 170)
     for result in report:

@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request, render_template, Response
 from flask_cors import CORS
 from scripts.jira_sprint_report import generate_jira_sprint_report, analyze_sprint
 from scripts.user_capacity_analysis import analyze_user_capacity
+from settings_manager import settings_manager
 import requests
 import os
 import base64
@@ -16,6 +17,10 @@ import threading
 import uuid
 import csv
 import io
+import json
+import uuid
+
+from ai_sprint_insights import AISprintInsights
 
 # Configure logging to show all debug information
 logging.basicConfig(
@@ -25,36 +30,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
+# Load environment variables as fallback
 load_dotenv()
 
-# Jira configuration
-JIRA_URL = os.getenv('JIRA_URL')
-JIRA_EMAIL = os.getenv('JIRA_EMAIL')
-JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')
-
-# Debug: Print environment variables status with masked values
-logger.debug("Checking environment variables...")
-logger.debug(f".env file exists: {os.path.exists('.env')}")
-logger.debug(f".env file size: {os.path.getsize('.env') if os.path.exists('.env') else 0} bytes")
-logger.debug(f"JIRA_URL: {JIRA_URL if JIRA_URL else 'Not set'}")
-logger.debug(f"JIRA_EMAIL: {JIRA_EMAIL if JIRA_EMAIL else 'Not set'}")
-logger.debug(f"JIRA_API_TOKEN length: {len(JIRA_API_TOKEN) if JIRA_API_TOKEN else 0}")
-
-# Verify the values are loaded correctly
-if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
-    logger.error("Missing environment variables:")
-    if not JIRA_URL:
-        logger.error("- JIRA_URL is not set")
-    if not JIRA_EMAIL:
-        logger.error("- JIRA_EMAIL is not set")
-    if not JIRA_API_TOKEN:
-        logger.error("- JIRA_API_TOKEN is not set")
-else:
-    logger.info("All environment variables are set")
-    logger.info(f"JIRA_URL: {JIRA_URL}")
-    logger.info(f"JIRA_EMAIL: {JIRA_EMAIL}")
-    logger.info(f"JIRA_API_TOKEN length: {len(JIRA_API_TOKEN)}")
+def get_jira_credentials():
+    """Get JIRA credentials from settings manager with environment fallback"""
+    try:
+        # First try settings manager
+        if settings_manager.has_valid_credentials():
+            credentials = settings_manager.get_jira_credentials()
+            logger.info("Using JIRA credentials from settings")
+            logger.info(f"JIRA_URL: {credentials['url']}")
+            logger.info(f"JIRA_EMAIL: {credentials['email']}")
+            logger.info(f"JIRA_API_TOKEN length: {len(credentials['api_token'])}")
+            return credentials
+        
+        # Fallback to environment variables
+        jira_url = os.getenv('JIRA_URL')
+        jira_email = os.getenv('JIRA_EMAIL') 
+        jira_token = os.getenv('JIRA_API_TOKEN')
+        
+        if jira_url and jira_email and jira_token:
+            logger.info("Using JIRA credentials from environment variables")
+            return {
+                'url': jira_url,
+                'email': jira_email,
+                'api_token': jira_token
+            }
+        
+        # If no credentials found anywhere
+            logger.warning("JIRA credentials not configured. Please configure them in Settings.")
+            return None
+    except Exception as e:
+        logger.error(f"Error loading JIRA credentials: {str(e)}")
+        return None
 
 app = Flask(__name__)
 CORS(app)
@@ -148,20 +157,18 @@ def handle_500_error(e):
 
 def get_jira_headers():
     try:
-        # Verify environment variables are loaded
-        if not JIRA_EMAIL or not JIRA_API_TOKEN:
-            logger.error("Missing Jira credentials in environment variables")
-            logger.error(f"JIRA_EMAIL: {'Set' if JIRA_EMAIL else 'Not set'}")
-            logger.error(f"JIRA_API_TOKEN: {'Set' if JIRA_API_TOKEN else 'Not set'}")
-            raise ValueError("Missing Jira credentials")
+        credentials = get_jira_credentials()
+        if not credentials:
+            logger.error("No JIRA credentials configured")
+            raise ValueError("No JIRA credentials configured. Please configure them in Settings.")
 
         # Debug: Print authentication details (without exposing the actual token)
         logger.debug("Generating Jira headers...")
-        logger.debug(f"Using email: {JIRA_EMAIL}")
-        logger.debug(f"API token length: {len(JIRA_API_TOKEN) if JIRA_API_TOKEN else 0}")
+        logger.debug(f"Using email: {credentials['email']}")
+        logger.debug(f"API token length: {len(credentials['api_token'])}")
         
         # Create base64 encoded string of email:api_token
-        auth_string = f"{JIRA_EMAIL}:{JIRA_API_TOKEN}"
+        auth_string = f"{credentials['email']}:{credentials['api_token']}"
         auth_bytes = auth_string.encode('ascii')
         base64_bytes = base64.b64encode(auth_bytes)
         base64_string = base64_bytes.decode('ascii')
@@ -187,12 +194,12 @@ def test_jira_connection():
     try:
         logger.debug("Testing Jira connection...")
         
-        # Verify JIRA_URL is set
-        if not JIRA_URL:
-            logger.error("JIRA_URL is not set in environment variables")
+        credentials = get_jira_credentials()
+        if not credentials:
+            logger.error("No JIRA credentials configured")
             return None
             
-        test_url = f'{JIRA_URL}/rest/api/2/myself'
+        test_url = f"{credentials['url']}/rest/api/2/myself"
         logger.debug(f"Testing connection to: {test_url}")
         
         try:
@@ -215,7 +222,7 @@ def test_jira_connection():
             logger.error(f"Response text: {response.text}")
             if response.status_code == 401:
                 logger.error("Authentication failed. Please check your email and API token.")
-                logger.error("Make sure your .env file contains the correct JIRA_EMAIL and JIRA_API_TOKEN")
+                logger.error("Make sure your credentials are correctly configured in Settings.")
             elif response.status_code == 403:
                 logger.error("Access forbidden. Please check your Jira permissions.")
         else:
@@ -236,12 +243,17 @@ def test_jira_connection():
 
 def get_project_info():
     try:
-        logger.debug(f"Attempting to fetch projects from: {JIRA_URL}/rest/api/2/project")
-        logger.debug(f"Using credentials - Email: {JIRA_EMAIL}")
+        credentials = get_jira_credentials()
+        if not credentials:
+            logger.error("No JIRA credentials configured")
+            return None, []
+            
+        logger.debug(f"Attempting to fetch projects from: {credentials['url']}/rest/api/2/project")
+        logger.debug(f"Using credentials - Email: {credentials['email']}")
         
         # Get all projects
         response = requests.get(
-            f'{JIRA_URL}/rest/api/2/project',
+            f'{credentials["url"]}/rest/api/2/project',
             headers=get_jira_headers()
         )
         
@@ -294,14 +306,28 @@ def get_project_info():
 def index():
     return render_template('index.html')
 
+@app.route('/debug-openai')
+def debug_openai():
+    return render_template('debug_openai_test.html')
+
+@app.route('/simple-test')
+def simple_test():
+    return render_template('simple_test.html')
+
 def fetch_all_labels():
     """Fetch all labels from Jira and update the cache"""
     try:
         logger.debug("Starting fetch_all_labels...")
         
+        # Get credentials
+        credentials = get_jira_credentials()
+        if not credentials:
+            logger.error("No JIRA credentials configured")
+            return False
+        
         # Search for issues with labels across all projects
         jql_query = 'labels is not EMPTY ORDER BY created DESC'
-        search_url = f'{JIRA_URL}/rest/api/2/search'
+        search_url = f'{credentials["url"]}/rest/api/2/search'
         
         logger.debug(f"Using JQL query: {jql_query}")
         logger.debug(f"Search URL: {search_url}")
@@ -411,10 +437,11 @@ def get_labels():
         search_text = request.args.get('search', '').strip()
         logger.debug(f"Search text: {search_text}")
         
-        # Verify environment variables
-        if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
+        # Verify credentials are configured
+        credentials = get_jira_credentials()
+        if not credentials:
             logger.error("Missing Jira credentials")
-            return jsonify({'error': 'Missing Jira credentials'}), 500
+            return jsonify({'error': 'Missing Jira credentials. Please configure them in Settings.'}), 500
             
         # Check if we need to refresh the cache
         if label_cache.needs_refresh():
@@ -479,8 +506,10 @@ def refresh_labels():
 @app.route('/api/labels', methods=['POST'])
 def add_label():
     try:
-        if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
-            return jsonify({'error': 'Missing Jira credentials. Please check your .env file.'}), 400
+        # Verify credentials are configured
+        credentials = get_jira_credentials()
+        if not credentials:
+            return jsonify({'error': 'Missing Jira credentials. Please configure them in Settings.'}), 400
 
         data = request.json
         new_label = data.get('label')
@@ -498,7 +527,7 @@ def add_label():
             }), 200
 
         # Get the SCAL project key
-        projects_response = make_jira_request(f'{JIRA_URL}/rest/api/2/project')
+        projects_response = make_jira_request(f'{credentials["url"]}/rest/api/2/project')
         if not projects_response:
             return jsonify({'error': 'Failed to fetch projects'}), 500
             
@@ -515,7 +544,7 @@ def add_label():
 
         # First, search for an existing issue in SCAL project to add the label to
         response = make_jira_request(
-            f'{JIRA_URL}/rest/api/2/search',
+            f'{credentials["url"]}/rest/api/2/search',
             params={
                 'jql': f'project = {scal_project["key"]}',
                 'maxResults': 1
@@ -537,7 +566,7 @@ def add_label():
         
         # Update the issue with the new label
         update_response = make_jira_request(
-            f'{JIRA_URL}/rest/api/2/issue/{issue_key}',
+            f'{credentials["url"]}/rest/api/2/issue/{issue_key}',
             method='PUT',
             json_data={'fields': {'labels': current_labels}}
         )
@@ -1290,6 +1319,11 @@ def api_jira_sprint_report():
     if not board_id:
         return jsonify({'error': 'Missing board_id parameter'}), 400
     try:
+        # Get credentials
+        credentials = get_jira_credentials()
+        if not credentials:
+            return jsonify({'error': 'Missing Jira credentials. Please configure them in Settings.'}), 500
+        
         # Step 1: Get the 5 most recent CLOSED sprints for this board
         print(f"Fetching most recent CLOSED sprints for board {board_id}")
         
@@ -1299,7 +1333,7 @@ def api_jira_sprint_report():
         max_results = 50
         
         while True:
-            sprints_url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}"
+            sprints_url = f"{credentials['url']}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}"
             response = make_jira_request(sprints_url)
             if not response or response.status_code != 200:
                 return jsonify({'error': 'Failed to fetch sprints from Jira'}), 500
@@ -1324,16 +1358,16 @@ def api_jira_sprint_report():
         # Sort by endDate (most recent first)
         closed_sprints.sort(key=lambda x: x.get('endDate', ''), reverse=True)
         
-        # Take the top 5 most recent closed sprints
-        top_5_closed_sprints = closed_sprints[:5]
+        # Take the top 15 most recent closed sprints
+        top_15_closed_sprints = closed_sprints[:15]
         
-        print("Top 5 most recent CLOSED sprints for report:")
-        for i, sprint in enumerate(top_5_closed_sprints):
+        print("Top 15 most recent CLOSED sprints for report:")
+        for i, sprint in enumerate(top_15_closed_sprints):
             print(f"{i+1}. {sprint.get('name')} - End: {sprint.get('endDate')} - State: {sprint.get('state')}")
         
-        # Step 2: Generate reports for these 5 closed sprints
+        # Step 2: Generate reports for these 15 closed sprints
         report = []
-        for sprint in top_5_closed_sprints:
+        for sprint in top_15_closed_sprints:
             print(f"Generating report for sprint: {sprint.get('name')}")
             result = analyze_sprint(sprint, board_id)
             if result:
@@ -1374,6 +1408,89 @@ def api_jira_sprint_report():
             return jsonify({'report': filtered_report})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/jira_sprint_report_stream', methods=['GET'])
+def api_jira_sprint_report_stream():
+    """
+    Streaming version of sprint report that sends results as they're generated
+    """
+    board_id = request.args.get('board_id', '').strip()
+    if not board_id:
+        return jsonify({'error': 'Missing board_id parameter'}), 400
+    
+    def generate_sprint_reports():
+        try:
+            # Get credentials
+            credentials = get_jira_credentials()
+            if not credentials:
+                yield f"data: {json.dumps({'error': 'Missing Jira credentials. Please configure them in Settings.'})}\n\n"
+                return
+            
+            # Send start event
+            yield f"data: {json.dumps({'type': 'start', 'total_expected': 15})}\n\n"
+            
+            # Get ALL sprints from the board
+            all_sprints = []
+            start_at = 0
+            max_results = 50
+            
+            while True:
+                sprints_url = f"{credentials['url']}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}"
+                response = make_jira_request(sprints_url)
+                if not response or response.status_code != 200:
+                    yield f"data: {json.dumps({'error': 'Failed to fetch sprints from Jira'})}\n\n"
+                    return
+                data = response.json()
+                
+                all_sprints.extend(data.get('values', []))
+                            
+                if data.get('isLast', True) or len(data.get('values', [])) == 0:
+                    break
+                start_at += max_results
+
+            # Filter for CLOSED sprints only and sort by endDate
+            closed_sprints = []
+            for sprint in all_sprints:
+                if sprint.get('state') == 'closed' and sprint.get('endDate'):
+                    closed_sprints.append(sprint)
+            
+            # Sort by endDate (most recent first)
+            closed_sprints.sort(key=lambda x: x.get('endDate', ''), reverse=True)
+            
+            # Take the top 15 most recent closed sprints
+            top_15_closed_sprints = closed_sprints[:15]
+            
+            # Send progress update
+            yield f"data: {json.dumps({'type': 'progress', 'message': f'Found {len(top_15_closed_sprints)} sprints to analyze'})}\n\n"
+            
+            # Generate reports for these 15 closed sprints and stream each result
+            for i, sprint in enumerate(top_15_closed_sprints):
+                sprint_name = sprint.get('name')
+                yield f"data: {json.dumps({'type': 'progress', 'message': f'Analyzing sprint {i+1}/15: {sprint_name}', 'current': i+1, 'total': 15})}\n\n"
+                
+                # Import analyze_sprint from the jira_sprint_report module
+                from scripts.jira_sprint_report import analyze_sprint
+                result = analyze_sprint(sprint, board_id)
+                if result:
+                    # Send individual sprint result
+                    yield f"data: {json.dumps({'type': 'sprint_result', 'data': result, 'index': i})}\n\n"
+            
+            # Send completion event
+            yield f"data: {json.dumps({'type': 'complete', 'message': 'All sprint reports generated successfully'})}\n\n"
+        
+        except Exception as e:
+            logger.error(f"Error in streaming sprint report: {str(e)}")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+    
+    return Response(
+        generate_sprint_reports(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*'
+        }
+    )
 
 @app.route('/api/capacity/analyze', methods=['POST'])
 def start_capacity_analysis():
@@ -1469,6 +1586,559 @@ def process_capacity_analysis(task_id, user_email, weeks_back):
         capacity_analysis_tasks[task_id]['status'] = 'error'
         capacity_analysis_tasks[task_id]['error'] = str(e)
 
+
+
+def analyze_sprint_report_data(sprint_data):
+    """Analyze sprint report data comprehensively"""
+    if not isinstance(sprint_data, list) or len(sprint_data) == 0:
+        return {
+            'overall_assessment': 'No sprint data available for analysis.',
+            'insights': [],
+            'key_observations': ['No data provided'],
+            'fallback': True
+        }
+    
+    # Debug: Log the first sprint data structure to understand the format
+    if len(sprint_data) > 0:
+        logger.info(f"DEBUG: First sprint data keys: {list(sprint_data[0].keys()) if isinstance(sprint_data[0], dict) else 'Not a dict'}")
+        logger.info(f"DEBUG: First sprint data sample: {sprint_data[0]}")
+    
+    # Initialize metrics
+    total_sprints = len(sprint_data)
+    completed_sprints = 0
+    total_committed = 0
+    total_completed = 0
+    total_story_points_committed = 0
+    total_story_points_completed = 0
+    velocity_data = []
+    issue_types = {}
+    priorities = {}
+    
+    # Analyze each sprint
+    for sprint in sprint_data:
+        if not isinstance(sprint, dict):
+            continue
+            
+        sprint_name = sprint.get('name', 'Unknown Sprint')
+        sprint_state = sprint.get('state', 'Unknown')
+        
+        # Count committed and completed issues - using exact field names from sprint table
+        committed = sprint.get('Initial Planned', sprint.get('initialPlanned', sprint.get('issuesCommitted', 0)))
+        completed = sprint.get('Completed', sprint.get('completed', sprint.get('issuesCompleted', 0)))
+        not_completed = sprint.get('Not Completed', sprint.get('notCompleted', sprint.get('issuesNotCompleted', 0)))
+        
+        # Additional fields from the table
+        added_during = sprint.get('Added During Sprint', sprint.get('addedDuring', 0))
+        removed_during = sprint.get('Removed During Sprint', sprint.get('removedDuring', 0))
+        
+        # Calculate total committed (initial + added - removed)
+        if added_during > 0 or removed_during > 0:
+            total_committed_sprint = committed + added_during - removed_during
+        else:
+            total_committed_sprint = committed
+        
+        # Story points
+        committed_sp = sprint.get('storyPointsCommitted', 0)
+        completed_sp = sprint.get('storyPointsCompleted', 0)
+        
+        total_committed += total_committed_sprint
+        total_completed += completed
+        total_story_points_committed += committed_sp
+        total_story_points_completed += completed_sp
+        
+        if sprint_state == 'CLOSED' or sprint_state.lower() == 'closed':
+            completed_sprints += 1
+        
+        # Calculate velocity for this sprint
+        velocity = (completed / total_committed_sprint * 100) if total_committed_sprint > 0 else 0
+        velocity_data.append({
+            'sprint': sprint_name,
+            'velocity': velocity,
+            'committed': total_committed_sprint,
+            'completed': completed,
+            'story_points_committed': committed_sp,
+            'story_points_completed': completed_sp
+        })
+        
+        # Analyze issues by type and priority if available
+        issues = sprint.get('issues', [])
+        for issue in issues:
+            issue_type = issue.get('typeName', 'Unknown')
+            priority = issue.get('priorityName', 'Unknown')
+            
+            issue_types[issue_type] = issue_types.get(issue_type, 0) + 1
+            priorities[priority] = priorities.get(priority, 0) + 1
+    
+    # Calculate overall metrics
+    overall_completion_rate = (total_completed / total_committed * 100) if total_committed > 0 else 0
+    story_point_completion_rate = (total_story_points_completed / total_story_points_committed * 100) if total_story_points_committed > 0 else 0
+    avg_velocity = sum(v['velocity'] for v in velocity_data) / len(velocity_data) if velocity_data else 0
+    
+    # Generate comprehensive insights
+    insights = []
+    
+    # 1. Performance insights with detailed analysis
+    if overall_completion_rate >= 90:
+        insights.append({
+            'title': 'Excellent Sprint Performance',
+            'description': f'Outstanding delivery with {overall_completion_rate:.1f}% completion rate across {total_sprints} sprints. Team demonstrates strong execution capability and effective sprint planning. This performance level indicates mature processes and good team dynamics.',
+            'category': 'Execution',
+            'impact': 'High'
+        })
+    elif overall_completion_rate >= 75:
+        insights.append({
+            'title': 'Good Sprint Performance',
+            'description': f'Solid performance with {overall_completion_rate:.1f}% completion rate. Team consistently meets most commitments but has room for improvement. Focus on identifying and addressing the remaining {100-overall_completion_rate:.1f}% gap.',
+            'category': 'Execution',
+            'impact': 'Medium'
+        })
+    elif overall_completion_rate >= 50:
+        insights.append({
+            'title': 'Moderate Sprint Performance',
+            'description': f'Performance at {overall_completion_rate:.1f}% indicates systematic issues affecting delivery. Nearly half of committed work is not completed. Investigate capacity planning, requirement clarity, and potential blockers.',
+            'category': 'Execution',
+            'impact': 'Medium'
+        })
+    else:
+        insights.append({
+            'title': 'Critical Sprint Performance Issues',
+            'description': f'Severely low completion rate of {overall_completion_rate:.1f}% signals fundamental problems. Team is completing less than half of commitments. Immediate intervention needed to address capacity, scope, or process issues.',
+            'category': 'Execution',
+            'impact': 'High'
+        })
+    
+    # 2. Detailed velocity analysis
+    if len(velocity_data) > 1:
+        velocities = [v['velocity'] for v in velocity_data]
+        velocity_variance = max(velocities) - min(velocities)
+        min_velocity = min(velocities)
+        max_velocity = max(velocities)
+        
+        if velocity_variance > 50:
+            insights.append({
+                'title': 'Highly Erratic Velocity Pattern',
+                'description': f'Extreme velocity fluctuation from {min_velocity:.1f}% to {max_velocity:.1f}% ({velocity_variance:.1f}% range) indicates unpredictable delivery. This suggests issues with estimation, scope creep, or external dependencies. Implement better sprint planning and scope management.',
+                'category': 'Planning',
+                'impact': 'High'
+            })
+        elif velocity_variance > 30:
+            insights.append({
+                'title': 'Inconsistent Velocity Patterns',
+                'description': f'Significant velocity variation ({velocity_variance:.1f}% range) from {min_velocity:.1f}% to {max_velocity:.1f}% suggests planning challenges. Review estimation accuracy, sprint commitment process, and external factors affecting delivery.',
+                'category': 'Planning',
+                'impact': 'Medium'
+            })
+        elif velocity_variance < 10:
+            insights.append({
+                'title': 'Excellent Velocity Consistency',
+                'description': f'Very consistent velocity with only {velocity_variance:.1f}% variation indicates mature planning processes and predictable delivery. Team demonstrates strong estimation skills and effective scope management.',
+                'category': 'Planning',
+                'impact': 'Low'
+            })
+        else:
+            insights.append({
+                'title': 'Good Velocity Stability',
+                'description': f'Reasonable velocity consistency with {velocity_variance:.1f}% variation. Minor fluctuations are normal, but monitor for trends that might indicate emerging issues.',
+                'category': 'Planning',
+                'impact': 'Low'
+            })
+    
+    # 3. Scope change analysis
+    total_added = sum(sprint.get('Added During Sprint', 0) for sprint in sprint_data if isinstance(sprint, dict))
+    total_removed = sum(sprint.get('Removed During Sprint', 0) for sprint in sprint_data if isinstance(sprint, dict))
+    scope_change_rate = ((total_added + total_removed) / total_committed * 100) if total_committed > 0 else 0
+    
+    if scope_change_rate > 30:
+        insights.append({
+            'title': 'High Scope Volatility',
+            'description': f'Significant scope changes with {scope_change_rate:.1f}% churn rate ({total_added} added, {total_removed} removed). This indicates poor initial planning, changing priorities, or inadequate requirement analysis. Implement better backlog refinement.',
+            'category': 'Planning',
+            'impact': 'High'
+        })
+    elif scope_change_rate > 15:
+        insights.append({
+            'title': 'Moderate Scope Changes',
+            'description': f'Noticeable scope adjustments with {scope_change_rate:.1f}% change rate. Some flexibility is healthy, but monitor to ensure it doesn\'t impact team predictability and stakeholder confidence.',
+            'category': 'Planning',
+            'impact': 'Medium'
+        })
+    elif scope_change_rate < 5:
+        insights.append({
+            'title': 'Stable Sprint Scope',
+            'description': f'Excellent scope stability with minimal changes ({scope_change_rate:.1f}% change rate). This indicates strong upfront planning and clear requirements. Team can focus on execution without scope disruption.',
+            'category': 'Planning',
+            'impact': 'Low'
+        })
+    
+    # 4. Sprint commitment accuracy
+    commitment_accuracy = (total_committed - abs(total_committed - total_completed)) / total_committed * 100 if total_committed > 0 else 0
+    
+    if commitment_accuracy > 90:
+        insights.append({
+            'title': 'Excellent Commitment Accuracy',
+            'description': f'Outstanding commitment accuracy at {commitment_accuracy:.1f}%. Team demonstrates strong estimation skills and realistic sprint planning. This builds stakeholder confidence and enables reliable roadmap planning.',
+            'category': 'Team',
+            'impact': 'High'
+        })
+    elif commitment_accuracy < 70:
+        insights.append({
+            'title': 'Commitment Accuracy Concerns',
+            'description': f'Low commitment accuracy at {commitment_accuracy:.1f}% indicates estimation or planning issues. Team consistently over or under-commits, affecting predictability. Focus on improving estimation techniques and historical velocity analysis.',
+            'category': 'Team',
+            'impact': 'Medium'
+        })
+    
+    # 5. Trend analysis for recent sprints
+    if len(velocity_data) >= 3:
+        recent_velocities = [v['velocity'] for v in velocity_data[-3:]]
+        earlier_velocities = [v['velocity'] for v in velocity_data[:-3]] if len(velocity_data) > 3 else []
+        
+        if earlier_velocities:
+            recent_avg = sum(recent_velocities) / len(recent_velocities)
+            earlier_avg = sum(earlier_velocities) / len(earlier_velocities)
+            trend_change = recent_avg - earlier_avg
+            
+            if trend_change > 10:
+                insights.append({
+                    'title': 'Positive Performance Trend',
+                    'description': f'Team velocity improving with recent average of {recent_avg:.1f}% vs earlier {earlier_avg:.1f}% (+{trend_change:.1f}%). This indicates learning, process improvements, or better team dynamics. Identify and reinforce successful practices.',
+                    'category': 'Team',
+                    'impact': 'Medium'
+                })
+            elif trend_change < -10:
+                insights.append({
+                    'title': 'Declining Performance Trend',
+                    'description': f'Concerning velocity decline with recent average of {recent_avg:.1f}% vs earlier {earlier_avg:.1f}% ({trend_change:.1f}%). Investigate potential causes: team changes, increased complexity, technical debt, or external factors.',
+                    'category': 'Team',
+                    'impact': 'High'
+                })
+    
+    # 6. Issue type analysis
+    if issue_types:
+        most_common_type = max(issue_types, key=issue_types.get)
+        type_percentage = (issue_types[most_common_type] / sum(issue_types.values()) * 100)
+        
+        insights.append({
+            'title': f'Work Distribution: {most_common_type} Dominant',
+            'description': f'Primary focus on {most_common_type} ({issue_types[most_common_type]} issues, {type_percentage:.1f}% of total work). Ensure this aligns with team goals and consider whether work distribution supports skill development and team growth.',
+            'category': 'Team',
+            'impact': 'Low'
+        })
+    
+    # Generate comprehensive key observations
+    key_observations = [
+        f"Analysis Period: {total_sprints} sprints covering recent team performance",
+        f"Overall Delivery: {total_completed} of {total_committed} committed issues completed ({overall_completion_rate:.1f}%)",
+        f"Velocity Metrics: Average {avg_velocity:.1f}% completion rate per sprint",
+        f"Scope Management: {total_added} issues added, {total_removed} issues removed during sprints",
+        f"Performance Range: {min([v['velocity'] for v in velocity_data]):.1f}% to {max([v['velocity'] for v in velocity_data]):.1f}% velocity across sprints" if velocity_data else "Single sprint analysis"
+    ]
+    
+    # Add scope change insights
+    if total_added > 0 or total_removed > 0:
+        net_scope_change = total_added - total_removed
+        if net_scope_change > 0:
+            key_observations.append(f"Net Scope Increase: +{net_scope_change} issues added beyond initial commitments")
+        elif net_scope_change < 0:
+            key_observations.append(f"Net Scope Reduction: {abs(net_scope_change)} issues removed from initial commitments")
+        else:
+            key_observations.append(f"Balanced Scope Changes: Equal additions and removals ({total_added} each)")
+    
+    # Add performance trend
+    if len(velocity_data) >= 3:
+        recent_avg = sum([v['velocity'] for v in velocity_data[-3:]]) / 3
+        key_observations.append(f"Recent Trend: {recent_avg:.1f}% average velocity in last 3 sprints")
+    
+    if total_story_points_committed > 0:
+        key_observations.append(f"Story Points: {total_story_points_completed} of {total_story_points_committed} completed ({story_point_completion_rate:.1f}%)")
+    
+    # Generate actionable recommendations
+    recommendations = []
+    
+    # Performance-based recommendations
+    if overall_completion_rate < 50:
+        recommendations.append("🚨 URGENT: Conduct immediate team assessment to identify root causes of low completion rate")
+        recommendations.append("📊 Implement daily progress tracking and impediment identification")
+        recommendations.append("🎯 Reduce sprint scope by 30-50% to rebuild team confidence and delivery momentum")
+        recommendations.append("👥 Consider team capacity assessment and workload rebalancing")
+    elif overall_completion_rate < 70:
+        recommendations.append("📈 Review and refine sprint planning process with historical velocity data")
+        recommendations.append("🔍 Conduct root cause analysis on incomplete items to identify patterns")
+        recommendations.append("⚡ Implement mid-sprint checkpoints to course-correct early")
+        recommendations.append("🎯 Focus on completing fewer items with higher quality")
+    elif overall_completion_rate < 85:
+        recommendations.append("✅ Fine-tune estimation process using historical completion data")
+        recommendations.append("🔄 Optimize sprint commitment process based on team capacity")
+        recommendations.append("📋 Enhance backlog refinement to improve story clarity")
+    
+    # Velocity consistency recommendations
+    if len(velocity_data) > 1:
+        velocities = [v['velocity'] for v in velocity_data]
+        velocity_variance = max(velocities) - min(velocities)
+        
+        if velocity_variance > 50:
+            recommendations.append("📊 Implement consistent story point estimation using Planning Poker or similar techniques")
+            recommendations.append("🔗 Create dependency mapping to identify and mitigate external blockers")
+            recommendations.append("📅 Establish sprint commitment guidelines based on team capacity and historical data")
+            recommendations.append("🎯 Focus on predictable delivery over high velocity")
+        elif velocity_variance > 30:
+            recommendations.append("📈 Standardize definition of done to improve completion consistency")
+            recommendations.append("🔄 Review sprint retrospective actions to ensure implementation")
+            recommendations.append("📊 Track and analyze velocity trends monthly for early intervention")
+    
+    # Scope management recommendations
+    if scope_change_rate > 30:
+        recommendations.append("📋 Strengthen backlog refinement process with clearer acceptance criteria")
+        recommendations.append("🛡️ Implement sprint commitment protection - limit mid-sprint changes")
+        recommendations.append("👥 Engage stakeholders in sprint planning to set realistic expectations")
+        recommendations.append("📊 Track and communicate the impact of scope changes on team velocity")
+    elif scope_change_rate > 15:
+        recommendations.append("⚖️ Balance sprint flexibility with commitment stability")
+        recommendations.append("📈 Monitor scope change trends and their impact on team morale")
+    
+    # Trend-based recommendations
+    if len(velocity_data) >= 3:
+        recent_velocities = [v['velocity'] for v in velocity_data[-3:]]
+        earlier_velocities = [v['velocity'] for v in velocity_data[:-3]] if len(velocity_data) > 3 else []
+        
+        if earlier_velocities:
+            recent_avg = sum(recent_velocities) / len(recent_velocities)
+            earlier_avg = sum(earlier_velocities) / len(earlier_velocities)
+            trend_change = recent_avg - earlier_avg
+            
+            if trend_change < -10:
+                recommendations.append("🔍 Investigate declining performance: team changes, technical debt, or external factors")
+                recommendations.append("💪 Implement team health check and morale assessment")
+                recommendations.append("🛠️ Review and address technical debt that may be slowing delivery")
+            elif trend_change > 10:
+                recommendations.append("🎉 Document and share successful practices driving performance improvement")
+                recommendations.append("📈 Consider gradually increasing sprint commitments to match improved capacity")
+    
+    # General continuous improvement recommendations
+    if total_sprints >= 5:
+        recommendations.append("📊 Establish team performance dashboard with key metrics and trends")
+        recommendations.append("🔄 Conduct quarterly sprint effectiveness reviews to identify systemic improvements")
+        recommendations.append("🎯 Set team performance goals based on historical data and improvement targets")
+    
+    recommendations.append("🗣️ Maintain regular retrospectives focused on actionable improvements")
+    recommendations.append("📈 Continue monitoring velocity trends and completion patterns for early issue detection")
+    
+    return {
+        'overall_assessment': f"Analysis of {total_sprints} sprint(s) shows {overall_completion_rate:.1f}% completion rate with {avg_velocity:.1f}% average velocity.",
+        'insights': insights,
+        'key_observations': key_observations,
+        'recommendations': recommendations,
+        'fallback': True
+    }
+
+def get_openai_insights(sprint_data, openai_config):
+    """Get AI-powered insights using OpenAI/Azure OpenAI"""
+    try:
+        from openai import AzureOpenAI, OpenAI
+        
+        # Prepare data summary for AI
+        summary = prepare_sprint_summary_for_ai(sprint_data)
+        
+        prompt = f"""
+        Analyze the following sprint performance data and provide insights:
+
+        {summary}
+
+        Please provide a comprehensive analysis including:
+        1. Overall assessment of team performance
+        2. Key insights about velocity, planning, and execution
+        3. Specific recommendations for improvement
+        4. Risk assessment and mitigation strategies
+
+        Format your response as JSON with this structure:
+        {{
+            "overall_assessment": "detailed assessment",
+            "insights": [
+                {{
+                    "title": "insight title",
+                    "description": "detailed description",
+                    "category": "Planning|Execution|Team|Process",
+                    "impact": "High|Medium|Low"
+                }}
+            ],
+            "key_observations": ["observation1", "observation2"],
+            "recommendations": ["recommendation1", "recommendation2"]
+        }}
+        """
+        
+        # Setup OpenAI client with new interface
+        if openai_config['use_azure']:
+            client = AzureOpenAI(
+                api_key=openai_config['api_key'],
+                api_version=openai_config['azure_api_version'],
+                azure_endpoint=openai_config['azure_endpoint']
+            )
+            model = openai_config['azure_deployment_name']
+        else:
+            client = OpenAI(api_key=openai_config['api_key'])
+            model = "gpt-4o-mini-2024-07-18"
+        
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are an expert Agile coach and sprint performance analyst with deep knowledge of Scrum methodologies."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=1500,
+            temperature=0.7
+        )
+        
+        # Parse the AI response
+        ai_response = response.choices[0].message.content
+        
+        # Log the full response for debugging
+        logger.info(f"Full OpenAI response object: {response}")
+        logger.info(f"Raw OpenAI response content: {ai_response}")
+        
+        # Check if response is empty
+        if not ai_response or not ai_response.strip():
+            logger.error("OpenAI response content is empty or missing")
+            return {
+                'overall_assessment': 'OpenAI response was empty or invalid.',
+                'insights': [],
+                'key_observations': [],
+                'recommendations': [],
+                'fallback': True,
+                'raw_openai_response': str(response),
+                'error': 'Empty response from OpenAI'
+            }
+        
+        # Clean the response - remove markdown code blocks if present
+        cleaned_response = ai_response.strip()
+        if cleaned_response.startswith('```json'):
+            cleaned_response = cleaned_response[7:]  # Remove ```json
+        if cleaned_response.startswith('```'):
+            cleaned_response = cleaned_response[3:]  # Remove ```
+        if cleaned_response.endswith('```'):
+            cleaned_response = cleaned_response[:-3]  # Remove trailing ```
+        cleaned_response = cleaned_response.strip()
+        
+        logger.info(f"Cleaned response: {cleaned_response}")
+        
+        try:
+            parsed_response = json.loads(cleaned_response)
+            return parsed_response
+        except json.JSONDecodeError as json_error:
+            logger.error(f"Error parsing OpenAI response as JSON: {json_error}")
+            logger.error(f"Raw response that failed to parse: {ai_response}")
+            logger.error(f"Cleaned response that failed to parse: {cleaned_response}")
+            return {
+                'overall_assessment': 'OpenAI response was not valid JSON.',
+                'insights': [],
+                'key_observations': [],
+                'recommendations': [],
+                'fallback': True,
+                'raw_openai_response': ai_response,
+                'cleaned_response': cleaned_response,
+                'json_error': str(json_error)
+            }
+        
+    except Exception as e:
+        logger.error(f"Error getting OpenAI insights: {str(e)}")
+        return {
+            'overall_assessment': f'Error occurred while getting AI insights: {str(e)}',
+            'insights': [],
+            'key_observations': [],
+            'recommendations': [],
+            'fallback': True,
+            'error': str(e)
+        }
+
+def prepare_sprint_summary_for_ai(sprint_data):
+    """Prepare sprint data summary for AI analysis"""
+    if not sprint_data:
+        return "No sprint data available."
+    
+    summary = f"Sprint Performance Analysis - {len(sprint_data)} sprints\n\n"
+    
+    for i, sprint in enumerate(sprint_data):
+        if not isinstance(sprint, dict):
+            continue
+            
+        sprint_name = sprint.get('name', sprint.get('Sprint Name', f'Sprint {i+1}'))
+        sprint_state = sprint.get('state', sprint.get('Status', 'Unknown'))
+        committed = sprint.get('Initial Planned', sprint.get('initialPlanned', sprint.get('issuesCommitted', 0)))
+        completed = sprint.get('Completed', sprint.get('completed', sprint.get('issuesCompleted', 0)))
+        not_completed = sprint.get('Not Completed', sprint.get('notCompleted', sprint.get('issuesNotCompleted', 0)))
+        added_during = sprint.get('Added During Sprint', sprint.get('addedDuring', 0))
+        removed_during = sprint.get('Removed During Sprint', sprint.get('removedDuring', 0))
+        committed_sp = sprint.get('storyPointsCommitted', 0)
+        completed_sp = sprint.get('storyPointsCompleted', 0)
+        
+        # Calculate total committed for this sprint
+        total_committed_sprint = committed + added_during - removed_during
+        
+        completion_rate = (completed / committed * 100) if committed > 0 else 0
+        
+        summary += f"Sprint: {sprint_name}\n"
+        summary += f"  State: {sprint_state}\n"
+        summary += f"  Issues Committed: {committed}\n"
+        summary += f"  Issues Completed: {completed}\n"
+        summary += f"  Issues Not Completed: {not_completed}\n"
+        summary += f"  Completion Rate: {completion_rate:.1f}%\n"
+        
+        if committed_sp > 0:
+            sp_completion_rate = (completed_sp / committed_sp * 100) if committed_sp > 0 else 0
+            summary += f"  Story Points Committed: {committed_sp}\n"
+            summary += f"  Story Points Completed: {completed_sp}\n"
+            summary += f"  Story Points Completion Rate: {sp_completion_rate:.1f}%\n"
+        
+        summary += "\n"
+    
+    return summary
+
+@app.route('/api/sprint/ai-insights', methods=['POST'])
+def api_sprint_ai_insights():
+    """Generate AI-powered insights for sprint data"""
+    try:
+        data = request.get_json()
+        sprint_data = data.get('sprint_data', [])
+        
+        if not sprint_data:
+            return jsonify({'error': 'No sprint data provided'}), 400
+        
+        # Get Jira credentials
+        credentials = get_jira_credentials()
+        if not credentials:
+            return jsonify({'error': 'JIRA credentials not configured'}), 401
+        
+        # Generate comprehensive AI insights using the sprint report data
+        insights = analyze_sprint_report_data(sprint_data)
+        
+        # Try to get OpenAI insights if configured
+        try:
+            from settings_manager import SettingsManager
+            settings = SettingsManager()
+            openai_config = settings.get_openai_config()
+            
+            if openai_config['api_key'] and len(openai_config['api_key']) > 10:
+                ai_insights = get_openai_insights(sprint_data, openai_config)
+                if ai_insights:
+                    # Merge AI insights with basic analysis
+                    insights.update(ai_insights)
+                    insights['fallback'] = False
+                else:
+                    insights['fallback'] = True
+            else:
+                insights['fallback'] = True
+        except Exception as e:
+            logger.error(f"Error getting OpenAI insights: {str(e)}")
+            insights['fallback'] = True
+        
+        return jsonify({
+            'status': 'success',
+            'insights': insights
+        })
+    
+    except Exception as e:
+        logger.error(f"Error generating AI insights: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/capacity/export/<task_id>', methods=['GET'])
 def export_capacity_analysis(task_id):
     """Export capacity analysis results as CSV with user preferences"""
@@ -1496,7 +2166,7 @@ def export_capacity_analysis(task_id):
         output.write(f"Capacity Analysis Report\n")
         output.write(f"User{delimiter}{result['user_email']}\n")
         output.write(f"Analysis Period{delimiter}{result['analysis_period']}\n")
-        output.write(f"Overall Rating{delimiter}{result['overall_rating']}\n")
+        # output.write(f"Overall Rating{delimiter}{result.get('overall_rating', '')}\n")
         output.write(f"Total Issues Analyzed{delimiter}{result['total_issues_analyzed']}\n")
         output.write(f"JIRA Link{delimiter}{result.get('jira_link', 'N/A')}\n")
         output.write(f"JQL Query{delimiter}{result.get('jql_query', 'N/A')}\n")
@@ -1662,54 +2332,117 @@ def save_jira_config():
         if not all([url, email, token]):
             return jsonify({'error': 'Missing required fields'}), 400
         
-        # Remove trailing slash from URL
-        if url.endswith('/'):
-            url = url[:-1]
-        
-        # For this demo, we'll store in a simple way
-        # In production, you'd want to encrypt the token and store securely
-        settings_file = 'jira_settings.json'
-        
-        settings = {
-            'url': url,
-            'email': email,
-            'token_encrypted': token  # In production, encrypt this
-        }
-        
-        import json
-        with open(settings_file, 'w') as f:
-            json.dump(settings, f, indent=2)
-        
-        return jsonify({'success': True})
+        # Use settings manager to save with encryption
+        if settings_manager.save_jira_settings(url, email, token):
+            logger.info("JIRA settings saved successfully")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Failed to save settings'}), 500
         
     except Exception as e:
+        logger.error(f"Error saving JIRA settings: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/settings/load-jira', methods=['GET'])
 def load_jira_config():
-    """Load saved JIRA configuration"""
+    """Load saved JIRA configuration with masked token"""
     try:
-        settings_file = 'jira_settings.json'
-        
-        if not os.path.exists(settings_file):
-            return jsonify({
-                'url': '',
-                'email': '',
-                'has_token': False
-            })
-        
-        import json
-        with open(settings_file, 'r') as f:
-            settings = json.load(f)
-        
-        return jsonify({
-            'url': settings.get('url', ''),
-            'email': settings.get('email', ''),
-            'has_token': bool(settings.get('token_encrypted'))
-        })
+        masked_settings = settings_manager.get_masked_settings()
+        return jsonify(masked_settings)
         
     except Exception as e:
+        logger.error(f"Error loading JIRA settings: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/settings/save-openai', methods=['POST'])
+def save_openai_config():
+    """Save OpenAI API key"""
+    try:
+        data = request.get_json()
+        api_key = data.get('api_key', '').strip()
+        
+        if not api_key:
+            return jsonify({'error': 'OpenAI API key is required'}), 400
+        
+        # Validate API key format (basic check)
+        if not api_key.startswith('sk-'):
+            return jsonify({'error': 'Invalid OpenAI API key format'}), 400
+        
+        # Save the API key
+        if settings_manager.save_setting('openai_api_key', api_key, encrypt=True):
+            # Reinitialize the AI insights client
+            # Initialize OpenAI (placeholder - actual implementation would go here)
+            
+            return jsonify({
+                'status': 'success',
+                'message': 'OpenAI API key saved successfully'
+            })
+        else:
+            return jsonify({'error': 'Failed to save OpenAI API key'}), 500
+    
+    except Exception as e:
+        logger.error(f"Error saving OpenAI config: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/settings/load-openai', methods=['GET'])
+def load_openai_config():
+    """Load OpenAI configuration status"""
+    try:
+        has_key = settings_manager.has_openai_key()
+        masked_key = ''
+        
+        if has_key:
+            key = settings_manager.get_setting('openai_api_key')
+            if key and len(key) > 10:
+                masked_key = key[:7] + '*' * (len(key) - 14) + key[-7:]
+            else:
+                masked_key = '*' * len(key) if key else ''
+        
+        return jsonify({
+            'status': 'success',
+            'has_key': has_key,
+            'masked_key': masked_key,
+            'ai_enabled': settings_manager.has_openai_key()
+        })
+    except Exception as e:
+        logger.error(f"Error loading OpenAI config: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/settings/test-openai', methods=['POST'])
+def test_openai_connection():
+    """Test OpenAI API connection"""
+    try:
+        data = request.get_json()
+        api_key = data.get('api_key', '').strip()
+        
+        if not api_key:
+            return jsonify({'error': 'OpenAI API key is required'}), 400
+        
+        # Test the API key with a simple request
+        import openai
+        test_client = openai.OpenAI(api_key=api_key)
+        
+        # Make a minimal test request
+        response = test_client.chat.completions.create(
+            model="gpt-4o-mini-2024-07-18",
+            messages=[{"role": "user", "content": "Test"}],
+            max_tokens=5
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'OpenAI API connection successful'
+        })
+    
+    except Exception as e:
+        error_msg = str(e)
+        if 'api_key' in error_msg.lower() or 'authentication' in error_msg.lower():
+            return jsonify({'error': 'Invalid API key or authentication failed'}), 400
+        elif 'quota' in error_msg.lower():
+            return jsonify({'error': 'API quota exceeded'}), 400
+        else:
+            logger.error(f"OpenAI test error: {error_msg}")
+            return jsonify({'error': f'API test failed: {error_msg}'}), 500
 
 # Share link storage (in production, use a database)
 shared_reports = {}
@@ -1842,6 +2575,209 @@ def serve_screenshot(filename):
     except Exception as e:
         logger.error(f"Error serving screenshot: {str(e)}")
         return "File not found", 404
+
+@app.route('/api/issues/multi_sprint', methods=['GET'])
+def api_issues_multi_sprint():
+    """Return issues that have been in more than one sprint, with counts by type, priority, status, label, and a Jira link."""
+    try:
+        board_id = request.args.get('board_id', '').strip()
+        if not board_id:
+            return jsonify({'error': 'Missing board_id parameter'}), 400
+        credentials = get_jira_credentials()
+        if not credentials:
+            return jsonify({'error': 'Missing Jira credentials.'}), 500
+        jira_url = credentials['url']
+        # Fetch all issues for the board (handle pagination)
+        all_issues = []
+        start_at = 0
+        max_results = 1000
+        while True:
+            issues_url = f"{jira_url}/rest/agile/1.0/board/{board_id}/issue?maxResults={max_results}&startAt={start_at}&fields=summary,priority,labels,customfield_10007,status,assignee,created,updated,issuetype,resolution"
+            issues_resp = make_jira_request(issues_url)
+            if not issues_resp or issues_resp.status_code != 200:
+                return jsonify({'error': 'Failed to fetch issues from Jira'}), 500
+            issues_data = issues_resp.json()
+            issues = issues_data.get('issues', [])
+            all_issues.extend(issues)
+            if len(issues) < max_results:
+                break
+            start_at += max_results
+        multi_sprint_issues = []
+        type_counts = {}
+        priority_counts = {}
+        label_counts = {}
+        status_counts = {'Completed': 0, 'In Progress': 0, 'Not Started': 0}
+        status_map = {
+            'done': 'Completed',
+            'closed': 'Completed',
+            'resolved': 'Completed',
+            'in progress': 'In Progress',
+            'in review': 'In Progress',
+            'to do': 'Not Started',
+            'open': 'Not Started',
+            'backlog': 'Not Started',
+        }
+        issue_keys = []
+        for issue in all_issues:
+            sprints = issue['fields'].get('customfield_10007', [])
+            if isinstance(sprints, list) and len(sprints) > 1:
+                key = issue['key']
+                summary = issue['fields'].get('summary', '')
+                priority = issue['fields'].get('priority', {}).get('name', 'None')
+                labels = issue['fields'].get('labels', [])
+                status_raw = issue['fields'].get('status', {}).get('name', 'Unknown')
+                status = status_map.get(status_raw.lower(), status_raw)
+                assignee = issue['fields'].get('assignee', {}).get('displayName', 'Unassigned') if issue['fields'].get('assignee') else 'Unassigned'
+                created = issue['fields'].get('created', '')
+                updated = issue['fields'].get('updated', '')
+                issuetype = issue['fields'].get('issuetype', {}).get('name', 'None')
+                resolution = issue['fields'].get('resolution', {}).get('name', 'N/A') if issue['fields'].get('resolution') else 'N/A'
+                multi_sprint_issues.append({
+                    'key': key,
+                    'summary': summary,
+                    'priority': priority,
+                    'labels': labels,
+                    'status': status,
+                    'assignee': assignee,
+                    'created': created,
+                    'updated': updated,
+                    'issuetype': issuetype,
+                    'resolution': resolution
+                })
+                issue_keys.append(key)
+                # Count by type
+                type_counts[issuetype] = type_counts.get(issuetype, 0) + 1
+                # Count by priority
+                priority_counts[priority] = priority_counts.get(priority, 0) + 1
+                # Count by label
+                for label in labels:
+                    label_counts[label] = label_counts.get(label, 0) + 1
+                # Count by status
+                if status in status_counts:
+                    status_counts[status] += 1
+                else:
+                    status_counts[status] = 1
+        total = len(multi_sprint_issues)
+        # Calculate percentages for type and priority
+        type_percentages = {k: f"{(v/total*100):.1f}%" for k, v in type_counts.items()} if total else {}
+        priority_percentages = {k: f"{(v/total*100):.1f}%" for k, v in priority_counts.items()} if total else {}
+        # Build Jira search link
+        jira_link = None
+        if issue_keys:
+            jql = f"key in ({','.join(issue_keys)})"
+            jira_link = f"{jira_url}/issues/?jql={requests.utils.quote(jql)}"
+        return jsonify({
+            'total': total,
+            'type_counts': type_counts,
+            'type_percentages': type_percentages,
+            'priority_counts': priority_counts,
+            'priority_percentages': priority_percentages,
+            'label_counts': label_counts,
+            'status_counts': status_counts,
+            'jira_link': jira_link,
+            'issues': multi_sprint_issues
+        })
+    except Exception as e:
+        logger.error(f"Error in multi-sprint issues API: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/jira/teams', methods=['GET'])
+def get_jira_teams():
+    """Teams API is not available for this Jira instance."""
+    return jsonify({'error': 'Jira Teams API is not available for this instance. Please use board-based selection.'}), 501
+
+@app.route('/api/issues/multi_sprint_by_team', methods=['GET'])
+def api_issues_multi_sprint_by_team():
+    """Return issues in more than one sprint for a given team (customfield_11800)."""
+    try:
+        team_id = request.args.get('team_id', '').strip()
+        if not team_id:
+            return jsonify({'error': 'Missing team_id parameter'}), 400
+        credentials = get_jira_credentials()
+        if not credentials:
+            return jsonify({'error': 'Missing Jira credentials.'}), 500
+        jira_url = credentials['url']
+        # JQL for issues with this team
+        jql = f'"customfield_11800" = {team_id}'
+        search_url = f"{jira_url}/rest/api/2/search?jql={requests.utils.quote(jql)}&maxResults=1000&fields=summary,priority,labels,customfield_10007,status,assignee,created,updated,issuetype,resolution"
+        issues_resp = make_jira_request(search_url)
+        if not issues_resp or issues_resp.status_code != 200:
+            return jsonify({'error': 'Failed to fetch issues from Jira'}), 500
+        issues_data = issues_resp.json()
+        issues = issues_data.get('issues', [])
+        multi_sprint_issues = []
+        type_counts = {}
+        priority_counts = {}
+        label_counts = {}
+        status_counts = {'Completed': 0, 'In Progress': 0, 'Not Started': 0}
+        status_map = {
+            'done': 'Completed',
+            'closed': 'Completed',
+            'resolved': 'Completed',
+            'in progress': 'In Progress',
+            'in review': 'In Progress',
+            'to do': 'Not Started',
+            'open': 'Not Started',
+            'backlog': 'Not Started',
+        }
+        issue_keys = []
+        for issue in issues:
+            sprints = issue['fields'].get('customfield_10007', [])
+            if isinstance(sprints, list) and len(sprints) > 1:
+                key = issue['key']
+                summary = issue['fields'].get('summary', '')
+                priority = issue['fields'].get('priority', {}).get('name', 'None')
+                labels = issue['fields'].get('labels', [])
+                status_raw = issue['fields'].get('status', {}).get('name', 'Unknown')
+                status = status_map.get(status_raw.lower(), status_raw)
+                assignee = issue['fields'].get('assignee', {}).get('displayName', 'Unassigned') if issue['fields'].get('assignee') else 'Unassigned'
+                created = issue['fields'].get('created', '')
+                updated = issue['fields'].get('updated', '')
+                issuetype = issue['fields'].get('issuetype', {}).get('name', 'None')
+                resolution = issue['fields'].get('resolution', {}).get('name', 'N/A') if issue['fields'].get('resolution') else 'N/A'
+                multi_sprint_issues.append({
+                    'key': key,
+                    'summary': summary,
+                    'priority': priority,
+                    'labels': labels,
+                    'status': status,
+                    'assignee': assignee,
+                    'created': created,
+                    'updated': updated,
+                    'issuetype': issuetype,
+                    'resolution': resolution
+                })
+                issue_keys.append(key)
+                # Count by type
+                type_counts[issuetype] = type_counts.get(issuetype, 0) + 1
+                # Count by priority
+                priority_counts[priority] = priority_counts.get(priority, 0) + 1
+                # Count by label
+                for label in labels:
+                    label_counts[label] = label_counts.get(label, 0) + 1
+                # Count by status
+                if status in status_counts:
+                    status_counts[status] += 1
+                else:
+                    status_counts[status] = 1
+        total = len(multi_sprint_issues)
+        # Build Jira search link
+        jira_link = None
+        if issue_keys:
+            jql_link = f"key in ({','.join(issue_keys)})"
+            jira_link = f"{jira_url}/issues/?jql={requests.utils.quote(jql_link)}"
+        return jsonify({
+            'total': total,
+            'type_counts': type_counts,
+            'priority_counts': priority_counts,
+            'label_counts': label_counts,
+            'status_counts': status_counts,
+            'jira_link': jira_link,
+            'issues': multi_sprint_issues
+        })
+    except Exception as e:
+        logger.error(f"Error in multi-sprint issues by team API: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Get port from environment variable or default to 8080

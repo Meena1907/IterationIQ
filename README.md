@@ -1,4 +1,4 @@
-# 🚀 Jira Hub - Comprehensive Project Management Dashboard
+# 🚀 Spark - Comprehensive Project Management Dashboard
 
 > A modern, full-featured web application for Jira analytics, sprint reporting, capacity planning, and team productivity optimization with built-in best practices guide.
 
@@ -305,14 +305,53 @@ graph TD
 
 ## 🔧 API Documentation
 
-### 📡 **Core Endpoints**
+### 📡 **Core Internal Endpoints**
 
 | Endpoint | Method | Purpose | Response |
 |----------|--------|---------|----------|
-| `/api/jira_sprint_report` | GET | Sprint analysis | JSON with metrics |
-| `/api/capacity/analyze` | POST | User capacity analysis | Task ID for tracking |
-| `/api/labels` | GET | Label management | Cached label list |
-| `/api/settings/test-jira` | POST | Connection testing | Status and user info |
+| `/api/jira_sprint_report` | GET | Sprint analysis (multi-sprint) | JSON with metrics |
+| `/api/jira/tracks` | GET | List all Jira projects (tracks) | JSON list of projects |
+| `/api/jira/tracks_customfield` | GET | Get custom field context/options | JSON with custom field info |
+| `/api/jira/boards_for_track` | GET | Boards for a given track | JSON list of boards |
+| `/api/jira/sprints_for_board` | GET | Sprints for a board | JSON list of sprints |
+| `/api/jira/sprint_report` | GET | Start async sprint report task | Task ID |
+| `/api/jira/sprint_report_progress` | GET | Sprint report task progress | Progress/status/result |
+| `/api/jira/all_boards` | GET | List specific boards | JSON list of boards |
+| `/api/jira/sprint_trends` | GET | Sprint trends for a board | JSON with trends |
+| `/api/jira/sprint_trends_start` | GET | Start async sprint trends task | Task ID |
+| `/api/jira/sprint_trends_progress` | GET | Sprint trends task progress | Progress/status/result |
+| `/api/labels` | GET | List/search labels | Cached label list |
+| `/api/labels/<old_label>` | PUT | Rename a label | Success/error |
+| `/api/labels/<label>` | DELETE | Delete a label | Success/error |
+| `/api/settings/test-jira` | POST | Test Jira connection | Status/user info |
+| `/api/settings/save-jira` | POST | Save Jira config | Success/error |
+| `/api/settings/load-jira` | GET | Load Jira config | Masked config |
+
+### 🌐 **External Jira API Endpoints Used**
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/rest/api/2/project` | GET | List all Jira projects |
+| `/rest/api/2/search` | GET | Search issues (JQL) |
+| `/rest/api/2/issue/{issueKey}` | GET/PUT | Get/update issue details/labels |
+| `/rest/api/2/myself` | GET | Get current user info |
+| `/rest/agile/1.0/board` | GET | List boards |
+| `/rest/agile/1.0/board/{boardId}/sprint` | GET | List sprints for a board |
+| `/rest/agile/1.0/sprint/{sprintId}` | GET | Sprint details |
+| `/rest/agile/1.0/sprint/{sprintId}/issue` | GET | Issues in a sprint |
+| `/rest/api/3/field/customfield_15428/context` | GET | Custom field context |
+| `/rest/api/3/field/customfield_15428/context/{contextId}/option` | GET | Custom field options |
+
+What is Jira REST API v2?
+REST API v2 is Jira's primary API for programmatically accessing and manipulating Jira data. It's the second version of their REST API (hence "v2") and provides comprehensive access to:
+Example of How It Works
+When you use Spark's label management feature, here's what happens behind the scenes:
+Spark calls: /rest/api/2/search with a JQL query like project = SCAL AND labels = "some-label"
+Jira returns: All issues matching that criteria
+Spark then calls: /rest/api/2/issue/{issueKey} to update each issue's labels
+Jira updates: The issue with the new label information
+
+> **Note:** All internal endpoints require valid Jira credentials (set in `.env` or via the UI). Most endpoints proxy or aggregate data from the above Jira REST APIs.
 
 ### 🔐 **Authentication**
 All API calls use Jira Basic Authentication with email and API token.

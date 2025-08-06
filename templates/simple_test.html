@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple JavaScript Test</title>
+</head>
+<body>
+    <h1>Simple JavaScript Test</h1>
+    <button id="testBtn">Click Me</button>
+    <div id="output"></div>
+    
+    <script>
+        alert('JavaScript is working!');
+        
+        document.getElementById('output').innerHTML = 'Script loaded at ' + new Date();
+        
+        document.getElementById('testBtn').addEventListener('click', function() {
+            alert('Button clicked!');
+            document.getElementById('output').innerHTML += '<br>Button was clicked at ' + new Date();
+        });
+        
+        console.log('Script executed successfully');
+    </script>
+</body>
+</html> 

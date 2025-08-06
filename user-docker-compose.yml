@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  jira-hub:
-    image: meenasingh3127/jira-hub:latest
-    container_name: jira-hub
+  spark:
+image: meenasingh3127/spark:latest
+container_name: spark
     ports:
       - "8080:8080"
     environment:

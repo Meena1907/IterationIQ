@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jira Label Manager</title>
+    <title>Spark - Sprint Analytics & Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -350,6 +350,16 @@
             transform: translateY(-6px);
             box-shadow: var(--hover-shadow);
             border-color: rgba(0, 171, 228, 0.2);
+        }
+
+        .clickable-card {
+            transition: all 0.3s ease;
+        }
+
+        .clickable-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 15px 35px rgba(0, 171, 228, 0.3);
+            border-color: rgba(0, 171, 228, 0.4);
         }
 
         .card-header {
@@ -866,6 +876,129 @@
                 margin: 0.25rem 0;
             }
         }
+
+        /* Analytics specific styles */
+        .analytics-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .analytics-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .analytics-card .card-title {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 0;
+        }
+
+        .analytics-card .card-text {
+            color: #6c757d;
+            font-size: 0.875rem;
+            margin-bottom: 0;
+        }
+
+        #analyticsSection .card {
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #analyticsSection .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom: none;
+        }
+
+        #analyticsSection .table th {
+            border-top: none;
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+
+        /* SprintCross horizontal alignment */
+    
+        #sprintCrossBreakdowns .col-md-4 {
+            flex: 1 1 0;
+            max-width: 120px;
+            min-width: 220px;
+        }
+       
+
+        /* Enhanced Progress Bar Styling */
+        #sprintCrossProgressBar .progress {
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 171, 228, 0.1);
+            overflow: hidden;
+        }
+
+        #sprintCrossProgressBar .progress-bar {
+            border-radius: 15px;
+            background: linear-gradient(90deg, #00ABE4 0%, #0088b8 50%, #0066cc 100%);
+            box-shadow: 0 0 10px rgba(0, 171, 228, 0.3);
+        }
+
+        #sprintCrossProgressText {
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        /* Enhanced Donut Chart Styling */
+        #sprintCrossBreakdowns .card {
+            border: none;
+            box-shadow: var(--card-shadow);
+            transition: var(--hover-shadow);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        #sprintCrossBreakdowns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+    gap: 0.8rem;
+    align-items: start;
+    margin-bottom: 1rem;
+}
+        #sprintCrossBreakdowns .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--hover-shadow);
+        }
+
+        #sprintCrossBreakdowns .card-header {
+            border: none;
+            font-weight: 600;
+            padding: 1rem 1.5rem;
+        }
+
+        #sprintCrossBreakdowns .card-body {
+            padding: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100px;
+        }
+        #sprintCrossBreakdowns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+    gap: 0.8rem;
+    align-items: start;
+    margin-bottom: 1rem;
+}
+
+#dashboardDonutBreakdowns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 0.8rem;
+  align-items: start;
+  margin-bottom: 1rem;
+}
+#dashboardDonutBreakdowns .card {
+  border: none;
+  box-shadow: var(--card-shadow);
+  border-radius: 15px;
+  overflow: hidden;
+}
     </style>
 </head>
 <body>
@@ -874,19 +1007,13 @@
         <div class="sidebar-header">
             <a href="#" class="sidebar-logo">
                 <i class="fas fa-project-diagram"></i>
-                <span>Jira Hub</span>
+                <span>Spark</span>
             </a>
         </div>
         <div class="sidebar-sticky">
             <ul class="nav flex-column">
                 <li class="nav-item">
                     <a class="nav-link active" href="#">
-                        <i class="fas fa-tags"></i>
-                        Label Manager
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#">
                         <i class="fas fa-chart-line"></i>
                         Sprint Report
                     </a>
@@ -899,8 +1026,14 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="#">
-                        <i class="fas fa-question-circle"></i>
-                        Help
+                        <i class="fas fa-lightbulb"></i>
+                        Best Practices
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" id="sprintCrossNav">
+                        <i class="fas fa-bug"></i>
+                        SprintCross
                     </a>
                 </li>
             </ul>
@@ -909,7 +1042,7 @@
 
     <!-- Modern Header -->
     <header class="modern-header">
-        <div class="header-title" id="mainTitle">Label Manager</div>
+        <div class="header-title" id="mainTitle">Sprint Report</div>
         <div class="header-actions">
             <button class="header-btn" data-bs-toggle="modal" data-bs-target="#settingsModal">
                 <i class="fas fa-cog"></i>
@@ -922,8 +1055,8 @@
     <main class="main-content">
         <div class="container-fluid">
 
-            <!-- Sprint Report Content (hidden by default) -->
-            <div id="sprintReportSection" style="display: none;">
+            <!-- Sprint Report Content (shown by default) -->
+            <div id="sprintReportSection">
                 <div class="card mb-4">
                     <div class="card-header">
                         <h5 class="mb-0">Sprint Report</h5>
@@ -938,9 +1071,7 @@
                                     <i class="fas fa-search"></i> Extract
                                 </button>
                             </div>
-                            <small class="form-text text-muted">
-                                You can paste the full Jira board URL or just enter the board ID number.
-                            </small>
+                           
                             <div id="extractedBoardInfo" class="mt-2" style="display: none;">
                                 <div class="alert alert-success">
                                     <i class="fas fa-check-circle"></i> 
@@ -956,6 +1087,9 @@
                             <button class="btn btn-outline-info ms-2" id="shareSprintReportBtn" disabled>
                                 <i class="fas fa-share-alt"></i> Share Report
                             </button>
+                            <button class="btn btn-outline-primary ms-2" id="generateAIInsightsBtn">
+                                <i class="fas fa-brain"></i> AI Insights
+                            </button>
                         </div>
                         <div id="sprintReportLoading" class="my-4" style="display:none;">
                             <div class="d-flex align-items-center">
@@ -965,7 +1099,32 @@
                         </div>
                         <div id="sprintReportError" class="alert alert-danger" style="display:none;"></div>
                         <div id="sprintReportTableWrapper" style="display:none;">
-                            <h5 class="mb-3">Last 5 Closed Sprints</h5>
+                            <h5 class="mb-3">Last 15 Closed Sprints</h5>
+                            
+                            <!-- Sprint Search/Filter Section -->
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-search"></i>
+                                        </span>
+                                        <input type="text" class="form-control" id="sprintSearchInput" 
+                                               placeholder="Search sprints by name (e.g., 'CC Sprint', 'Codeflow')">
+                                        <button class="btn btn-outline-secondary" type="button" id="clearSprintSearchBtn">
+                                            <i class="fas fa-times"></i> Clear
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex justify-content-end align-items-center">
+                                        <span class="text-muted me-2">Filtered:</span>
+                                        <span class="badge bg-primary" id="sprintFilterCount">0</span>
+                                        <span class="text-muted ms-2">of</span>
+                                        <span class="badge bg-secondary ms-1" id="sprintTotalCount">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <table class="table table-bordered table-hover">
                                 <thead>
                                     <tr id="sprintReportTableHead"></tr>
@@ -1011,6 +1170,8 @@
                                     </div>
                                 </div>
                             </div>
+
+
                         </div>
                     </div>
                 </div>
@@ -1083,16 +1244,15 @@
                         <!-- Results Section -->
                         <div id="capacityAnalysisResults" style="display:none;">
                             <!-- User Performance Overview -->
-                            <div class="row mb-4">
+                            <div class="dashboardDonutBreakdowns">
                                 <div class="col-md-12">
                                     <div class="card">
                                         <div class="card-header d-flex justify-content-between align-items-center">
-                                            <h6 class="mb-0">Performance Overview</h6>
+                                            <h6 class="mb-0">Overview</h6>
                                             <div class="d-flex align-items-center gap-2">
-                                                <a href="#" id="viewInJiraLink" class="btn btn-outline-primary btn-sm" target="_blank" style="display: none;">
+                                                <a href="#" id="viewInJiraLink" class="btn btn-light btn-sm" target="_blank" style="display: none;">
                                                     <i class="fas fa-external-link-alt me-1"></i>View in JIRA
                                                 </a>
-                                                <span class="badge fs-6" id="overallRatingBadge"></span>
                                             </div>
                                         </div>
                                         <div class="card-body">
@@ -1133,7 +1293,7 @@
                             </div>
                             
                             <!-- Issue Breakdown Section -->
-                            <div class="row mb-4">
+                            <div class="dashboardDonutBreakdowns">
                                 <div class="col-md-4">
                                     <div class="card">
                                         <div class="card-header">
@@ -1173,11 +1333,11 @@
                             </div>
                             
                             <!-- Weekly Performance Chart -->
-                            <div class="row mb-4">
+                            <div class="">
                                 <div class="col-md-12">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h6 class="mb-0">Weekly Performance Trend</h6>
+                                            <h6 class="mb-0">Weekly Trend</h6>
                                         </div>
                                         <div class="card-body">
                                             <canvas id="weeklyPerformanceChart" width="800" height="300"></canvas>
@@ -1213,55 +1373,6 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Label Manager Content (default) -->
-            <div id="labelManagerSection">
-                <!-- Loading Spinner -->
-                <div id="loadingSpinner" class="loading-spinner text-center">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2">Loading labels...</p>
-                </div>
-
-                <!-- Error Message -->
-                <div id="errorMessage" class="error-message alert alert-danger text-center"></div>
-
-                <!-- Success Message -->
-                <div id="successMessage" class="success-message alert alert-success text-center"></div>
-
-                <!-- Labels List -->
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Available Labels</h5>
-                        <div class="d-flex align-items-center">
-                            <div class="input-group me-3" style="width: 300px;">
-                                <input type="text" class="form-control" id="searchInput" placeholder="Type at least 2 characters to search...">
-                                <button class="btn btn-outline-secondary" type="button" id="searchButton">
-                                    <i class="fas fa-search"></i>
-                                </button>
-                            </div>
-                            <button class="btn btn-outline-secondary me-2" id="refreshLabels">
-                                <i class="fas fa-sync-alt"></i> Refresh
-                            </button>
-                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addLabelModal">
-                                <i class="fas fa-plus"></i> Add New Label
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div id="searchStatus" class="text-center mb-3" style="display: none;">
-                            <small class="text-muted">Searching...</small>
-                        </div>
-                        <div id="searchInfo" class="text-center mb-3" style="display: none;">
-                            <small class="text-muted"></small>
-                        </div>
-                        <div class="row" id="labelsContainer">
-                            <!-- Labels will be dynamically added here -->
                         </div>
                     </div>
                 </div>
@@ -1312,6 +1423,66 @@
                     </div>
                 </div>
             </div>
+
+            <!-- SprintCross Section (hidden by default) -->
+            <div id="sprintCrossSection" style="display: none;">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-bug me-2"></i>
+                            SprintCross (Multi-Sprint)
+                        </h5>
+                        <button id="sprintCrossJiraBtn" class="btn btn-outline-secondary" style="display:none;" target="_blank">
+                            <i class="fas fa-external-link-alt me-1"></i> View in JIRA
+                                </button>
+                            </div>
+                    <div class="card-body">
+                        <div id="sprintCrossProgressBar" class="mb-3" style="display:none;">
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: 0%" id="sprintCrossProgressBarFill"></div>
+                            </div>
+                            <div class="text-center small text-muted mt-1" id="sprintCrossProgressText">Initializing...</div>
+                        </div>
+                        <form id="sprintCrossForm" class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="sprintCrossBoardInput" class="form-label">Jira Board URL or Board ID</label>
+                                <input type="text" class="form-control" id="sprintCrossBoardInput" placeholder="Enter Jira board URL or Board ID" required>
+                </div>
+                            <div class="col-md-2 align-self-end">
+                                <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+                        </form>
+                        <div id="sprintCrossSummary" class="mb-4"></div>
+                        <div id="sprintCrossBreakdowns" style="display:none;">
+                            <div>
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white"><i class="fas fa-tasks me-2"></i>Issue Types</div>
+                                    <div class="card-body">
+                                        <canvas id="sprintCrossTypeChart" width="50" height="50"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="card h-100">
+                                    <div class="card-header bg-danger text-white"><i class="fas fa-flag me-2"></i>Priority Levels</div>
+                                    <div class="card-body">
+                                        <canvas id="sprintCrossPriorityChart" width="50" height="50"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="card h-100">
+                                    <div class="card-header bg-success text-white"><i class="fas fa-check-circle me-2"></i>Completion Status</div>
+                                    <div class="card-body">
+                                        <canvas id="sprintCrossStatusChart" width="50" height="50"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 
@@ -1336,6 +1507,11 @@
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="export-tab" data-bs-toggle="tab" data-bs-target="#export-options" type="button" role="tab">
                                 <i class="fas fa-download me-2"></i>Export Options
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="ai-config-tab" data-bs-toggle="tab" data-bs-target="#ai-config" type="button" role="tab">
+                                <i class="fas fa-brain me-2"></i>AI Configuration
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
@@ -1370,6 +1546,22 @@
                                                 <button class="btn btn-outline-secondary" type="button" id="toggleApiToken">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
+                                                <button class="btn btn-outline-warning" type="button" id="editApiToken" style="display: none;">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                            </div>
+                                            <div id="tokenStatus" style="display: none;">
+                                                <small class="text-success">
+                                                    <i class="fas fa-check-circle me-1"></i>API Token configured
+                                                    <span class="ms-2">
+                                                        <button class="btn btn-sm btn-link p-0" id="showMaskedToken">
+                                                            Show masked token
+                                                        </button>
+                                                    </span>
+                                                </small>
+                                                <div id="maskedTokenDisplay" style="display: none;" class="mt-2">
+                                                    <small class="font-monospace text-muted" id="maskedTokenText"></small>
+                                                </div>
                                             </div>
                                             <small class="form-text text-muted">
                                                 <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">
@@ -1473,6 +1665,91 @@
                             </div>
                         </div>
 
+                        <!-- AI Configuration Tab -->
+                        <div class="tab-pane fade" id="ai-config" role="tabpanel">
+                            <h6 class="mb-3">AI-Powered Insights Configuration</h6>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">OpenAI Integration</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <form id="openaiConfigForm">
+                                                <div class="mb-3">
+                                                    <label for="openaiApiKey" class="form-label">OpenAI API Key</label>
+                                                    <div class="input-group">
+                                                        <input type="password" class="form-control" id="openaiApiKey" placeholder="sk-...">
+                                                        <button class="btn btn-outline-secondary" type="button" id="toggleOpenaiApiKey">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                    </div>
+                                                    <div id="openaiKeyStatus" style="display: none;">
+                                                        <small class="text-success">
+                                                            <i class="fas fa-check-circle me-1"></i>API Key configured
+                                                            <span class="ms-2">
+                                                                <button class="btn btn-sm btn-link p-0" id="showMaskedOpenaiKey">
+                                                                    Show masked key
+                                                                </button>
+                                                            </span>
+                                                        </small>
+                                                        <div id="maskedOpenaiKeyDisplay" style="display: none;" class="mt-2">
+                                                            <small class="font-monospace text-muted" id="maskedOpenaiKeyText"></small>
+                                                        </div>
+                                                    </div>
+                                                    <small class="form-text text-muted">
+                                                        <a href="https://platform.openai.com/api-keys" target="_blank">
+                                                            <i class="fas fa-external-link-alt"></i> Get OpenAI API Key
+                                                        </a>
+                                                    </small>
+                                                </div>
+                                                <div class="d-flex gap-2">
+                                                    <button type="button" class="btn btn-primary" id="testOpenaiConnection">
+                                                        <i class="fas fa-plug me-2"></i>Test Connection
+                                                    </button>
+                                                    <button type="button" class="btn btn-success" id="saveOpenaiConfig">
+                                                        <i class="fas fa-save me-2"></i>Save Configuration
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">AI Status</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="aiConnectionStatus">
+                                                <div class="text-muted">
+                                                    <i class="fas fa-question-circle me-2"></i>Not configured
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="card mt-3">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">What AI Provides</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul class="list-unstyled small">
+                                                <li><i class="fas fa-check text-success me-2"></i>Sprint performance analysis</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Actionable improvement recommendations</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Scope change pattern insights</li>
+                                                <li><i class="fas fa-check text-success me-2"></i>Team velocity optimization tips</li>
+                                            </ul>
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                Powered by GPT-4 for expert-level sprint coaching insights.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- UI Preferences Tab -->
                         <div class="tab-pane fade" id="ui-preferences" role="tabpanel">
                             <h6 class="mb-3">User Interface Preferences</h6>
@@ -1516,7 +1793,7 @@
                                             <div class="mb-3">
                                                 <label for="defaultView" class="form-label">Default View</label>
                                                 <select class="form-select" id="defaultView">
-                                                    <option value="label-manager">Label Manager</option>
+            
                                                     <option value="sprint-report">Sprint Report</option>
                                                     <option value="capacity-planning">Capacity Planning</option>
                                                 </select>
@@ -1578,6 +1855,101 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button type="button" class="btn btn-primary" id="saveAllSettings">
                         <i class="fas fa-save me-2"></i>Save All Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Insights Modal -->
+    <div class="modal fade" id="aiInsightsModal" tabindex="-1" aria-labelledby="aiInsightsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="aiInsightsModalLabel">
+                        <i class="fas fa-brain me-2"></i>🤖 AI-Powered Sprint Insights
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    
+                    <!-- Loading State -->
+                    <div id="aiInsightsLoading" class="text-center py-4" style="display:none;">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <h6>AI is analyzing your sprint data...</h6>
+                        <p class="text-muted">This may take a few seconds</p>
+                    </div>
+                    
+                    <!-- Error State -->
+                    <div id="aiInsightsError" class="alert alert-warning" style="display:none;">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <div>
+                                <strong>AI Insights Unavailable</strong>
+                                <p class="mb-0">Please configure your OpenAI API key in Settings to enable AI-powered insights.</p>
+                                <button class="btn btn-sm btn-outline-primary mt-2" onclick="$('#settingsModal').modal('show'); $('#aiInsightsModal').modal('hide');">
+                                    <i class="fas fa-cog me-1"></i>Configure AI Settings
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Results -->
+                    <div id="aiInsightsResults" style="display:none;">
+                        
+                        <!-- Overall Assessment -->
+                        <div class="dashboardDonutBreakdowns">
+                            <div class="col-12">
+                                <div class="card border-primary">
+                                    <div class="card-header bg-primary text-white">
+                                        <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Overall Sprint Health Assessment</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="overallAssessment">
+                                            <!-- Overall assessment will be populated here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Key Insights -->
+                        <div class="dashboardDonutBreakdowns">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3"><i class="fas fa-lightbulb me-2"></i>Actionable Recommendations</h6>
+                                <div id="aiInsightsList">
+                                    <!-- AI insights will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Key Observations -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="card border-info">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0"><i class="fas fa-eye me-2"></i>Key Observations</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul id="keyObservations" class="mb-0">
+                                            <!-- Key observations will be populated here -->
+                                        </ul>
+                                        <div class="mt-3 text-center">
+                                            <small class="text-muted">
+                                                <i class="fas fa-robot me-1"></i>Powered by GPT-4 AI
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="regenerateInsightsBtn" style="display:none;">
+                        <i class="fas fa-refresh me-2"></i>Regenerate Insights
                     </button>
                 </div>
             </div>
@@ -1738,54 +2110,7 @@
         </div>
     </div>
 
-    <!-- Add Label Modal -->
-    <div class="modal fade" id="addLabelModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add New Label</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="addLabelForm">
-                        <div class="mb-3">
-                            <label for="newLabel" class="form-label">Label Name</label>
-                            <input type="text" class="form-control" id="newLabel" required>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="saveNewLabel">Add Label</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Rename Label Modal -->
-    <div class="modal fade" id="renameModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Rename Label</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="renameForm">
-                        <input type="hidden" id="oldLabel">
-                        <div class="mb-3">
-                            <label for="newLabelName" class="form-label">New Label Name</label>
-                            <input type="text" class="form-control" id="newLabelName" required>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="saveRename">Save Changes</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -1821,341 +2146,7 @@
             }, 5000);
         }
 
-        // Function to display labels
-        function displayLabels(labels, searchInfo = null) {
-            const container = document.getElementById('labelsContainer');
-            container.innerHTML = '';
-            
-            // Debug log
-            console.log('Displaying labels:', labels);
-            console.log('Labels type:', typeof labels);
-            console.log('Is array?', Array.isArray(labels));
-            
-            // Ensure labels is an array
-            if (!Array.isArray(labels)) {
-                console.error('Labels is not an array:', labels);
-                container.innerHTML = '<div class="col-12 text-center"><p class="text-muted">Error: Invalid data format</p></div>';
-                return;
-            }
-            
-            if (labels.length === 0) {
-                container.innerHTML = '<div class="col-12 text-center"><p class="text-muted">No labels found</p></div>';
-                return;
-            }
-            
-            labels.forEach(label => {
-                if (!label) return; // Skip null or undefined labels
-                
-                const card = document.createElement('div');
-                card.className = 'col-md-4 mb-3';
-                card.innerHTML = `
-                    <div class="card label-card">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">${label}</h5>
-                                <div class="action-buttons">
-                                    <button class="btn btn-sm btn-outline-primary me-2" onclick="openRenameModal('${label}')">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteLabel('${label}')">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
 
-            // Update search info if provided
-            if (searchInfo) {
-                const searchInfoDiv = document.getElementById('searchInfo');
-                searchInfoDiv.style.display = 'block';
-                let infoText = `Found ${labels.length} labels`;
-                if (searchInfo.total_labels) {
-                    infoText += ` out of ${searchInfo.total_labels} total labels`;
-                }
-                if (searchInfo.cache_updated) {
-                    const updateTime = new Date(searchInfo.cache_updated);
-                    infoText += ` (Cache updated: ${updateTime.toLocaleTimeString()})`;
-                }
-                searchInfoDiv.querySelector('small').textContent = infoText;
-            }
-        }
-
-        // Function to search labels with debouncing
-        let searchTimeout;
-        let isSearching = false;
-
-        async function searchLabels(searchText) {
-            if (isSearching) return; // Prevent multiple simultaneous searches
-            
-            isSearching = true;
-            showLoading();
-            document.getElementById('searchStatus').style.display = 'block';
-            document.getElementById('searchInfo').style.display = 'none';
-            
-            try {
-                console.log('Searching for:', searchText);
-                const response = await fetch(`/api/labels?search=${encodeURIComponent(searchText)}`);
-                console.log('Response status:', response.status);
-                
-                const data = await response.json();
-                console.log('Search response:', data);
-                
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to fetch labels');
-                }
-                
-                // Ensure we have the correct data structure
-                if (!data || !Array.isArray(data.labels)) {
-                    console.error('Invalid response format:', data);
-                    throw new Error('Invalid response format from server');
-                }
-                
-                displayLabels(data.labels, {
-                    total_labels: data.total_labels || 0,
-                    cache_updated: data.cache_updated
-                });
-            } catch (error) {
-                console.error('Search error:', error);
-                showError(error.message);
-                displayLabels([]); // Clear the display on error
-            } finally {
-                hideLoading();
-                document.getElementById('searchStatus').style.display = 'none';
-                isSearching = false;
-            }
-        }
-
-        // Add event listeners for search with improved debouncing
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            const searchText = e.target.value.trim();
-            clearTimeout(searchTimeout);
-            
-            if (searchText.length < 2) {
-                displayLabels([]);
-                return;
-            }
-            
-            searchTimeout = setTimeout(() => {
-                searchLabels(searchText);
-            }, 500); // Increased debounce time to 500ms
-        });
-
-        document.getElementById('searchButton').addEventListener('click', () => {
-            const searchText = document.getElementById('searchInput').value.trim();
-            if (searchText.length >= 2) {
-                searchLabels(searchText);
-            }
-        });
-
-        // Add new label
-        document.getElementById('saveNewLabel').addEventListener('click', async () => {
-            const label = document.getElementById('newLabel').value.trim();
-            if (!label) {
-                showError('Please enter a label name');
-                return;
-            }
-
-            showLoading();
-            try {
-                const response = await fetch('/api/labels', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ label })
-                });
-                
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to add label');
-                }
-
-                if (data.exists) {
-                    showError(`Label "${label}" already exists`);
-                } else {
-                    showSuccess(`Label "${label}" added successfully`);
-                    document.getElementById('newLabel').value = '';
-                    bootstrap.Modal.getInstance(document.getElementById('addLabelModal')).hide();
-                }
-
-                // Refresh search results if there's a search term
-                const searchText = document.getElementById('searchInput').value.trim();
-                if (searchText.length >= 2) {
-                    searchLabels(searchText);
-                } else {
-                    // If no search, refresh all labels
-                    const response = await fetch('/api/labels');
-                    const data = await response.json();
-                    if (response.ok && Array.isArray(data.labels)) {
-                        displayLabels(data.labels, {
-                            total_labels: data.total_labels || 0,
-                            cache_updated: data.cache_updated
-                        });
-                    }
-                }
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                hideLoading();
-            }
-        });
-
-        // Delete label
-        async function deleteLabel(label) {
-            if (!confirm(`Are you sure you want to delete the label "${label}"?`)) return;
-            
-            showLoading();
-            try {
-                const response = await fetch(`/api/labels/${encodeURIComponent(label)}`, {
-                    method: 'DELETE'
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to delete label');
-                }
-
-                const result = await response.json();
-                showSuccess(result.message);
-                // Refresh search results if there's a search term
-                const searchText = document.getElementById('searchInput').value.trim();
-                if (searchText.length >= 2) {
-                    searchLabels(searchText);
-                }
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // Rename label
-        const renameModal = new bootstrap.Modal(document.getElementById('renameModal'));
-        
-        function openRenameModal(label) {
-            document.getElementById('oldLabel').value = label;
-            document.getElementById('newLabelName').value = label;
-            renameModal.show();
-        }
-
-        document.getElementById('saveRename').addEventListener('click', async () => {
-            const oldLabel = document.getElementById('oldLabel').value;
-            const newLabel = document.getElementById('newLabelName').value;
-            
-            if (!newLabel) return;
-
-            showLoading();
-            try {
-                const response = await fetch(`/api/labels/${encodeURIComponent(oldLabel)}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ new_label: newLabel })
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to rename label');
-                }
-
-                const result = await response.json();
-                showSuccess(result.message);
-                renameModal.hide();
-                // Refresh search results if there's a search term
-                const searchText = document.getElementById('searchInput').value.trim();
-                if (searchText.length >= 2) {
-                    searchLabels(searchText);
-                }
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                hideLoading();
-            }
-        });
-
-        // Function to refresh labels
-        async function refreshLabels() {
-            showLoading();
-            try {
-                console.log('Refreshing labels...');
-                const response = await fetch('/api/labels/refresh', {
-                    method: 'POST'
-                });
-                console.log('Refresh response status:', response.status);
-                
-                const data = await response.json();
-                console.log('Refresh response:', data);
-                
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to refresh labels');
-                }
-
-                showSuccess(data.message);
-                
-                // Refresh the current view
-                const searchText = document.getElementById('searchInput').value.trim();
-                if (searchText.length >= 2) {
-                    searchLabels(searchText);
-                } else {
-                    // If no search, show all labels
-                    const response = await fetch('/api/labels');
-                    const data = await response.json();
-                    console.log('All labels response:', data);
-                    
-                    if (!response.ok) {
-                        throw new Error(data.error || 'Failed to fetch labels');
-                    }
-                    
-                    if (!data || !Array.isArray(data.labels)) {
-                        throw new Error('Invalid response format from server');
-                    }
-                    
-                    displayLabels(data.labels, {
-                        total_labels: data.total_labels || 0,
-                        cache_updated: data.cache_updated
-                    });
-                }
-            } catch (error) {
-                console.error('Refresh error:', error);
-                showError(error.message);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // Add event listener for refresh button
-        document.getElementById('refreshLabels').addEventListener('click', refreshLabels);
-
-        // Initial load of all labels
-        window.addEventListener('load', async () => {
-            try {
-                console.log('Loading initial labels...');
-                const response = await fetch('/api/labels');
-                console.log('Initial response status:', response.status);
-                
-                const data = await response.json();
-                console.log('Initial response:', data);
-                
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to fetch labels');
-                }
-                
-                if (!data || !Array.isArray(data.labels)) {
-                    throw new Error('Invalid response format from server');
-                }
-                
-                displayLabels(data.labels, {
-                    total_labels: data.total_labels || 0,
-                    cache_updated: data.cache_updated
-                });
-            } catch (error) {
-                console.error('Initial load error:', error);
-                showError(error.message);
-                displayLabels([]); // Clear the display on error
-            }
-        });
 
         // Sidebar navigation logic
         document.querySelectorAll('.sidebar .nav-link').forEach(link => {
@@ -2166,24 +2157,28 @@
                 const text = this.textContent.trim();
                 
                 // Hide all sections first
-                document.getElementById('labelManagerSection').style.display = 'none';
                 document.getElementById('sprintReportSection').style.display = 'none';
                 document.getElementById('capacityPlanningSection').style.display = 'none';
                 document.getElementById('helpSection').style.display = 'none';
+                document.getElementById('sprintCrossSection').style.display = 'none';
                 
                 if (text === 'Sprint Report') {
                     document.getElementById('sprintReportSection').style.display = 'block';
                     document.getElementById('mainTitle').textContent = 'Sprint Report';
+                    trackPageView('Sprint Report');
                 } else if (text === 'Capacity Planning') {
                     document.getElementById('capacityPlanningSection').style.display = 'block';
                     document.getElementById('mainTitle').textContent = 'Capacity Planning';
-                } else if (text === 'Help') {
+                    trackPageView('Capacity Planning');
+                } else if (text === 'Best Practices') {
                     document.getElementById('helpSection').style.display = 'block';
-                    document.getElementById('mainTitle').textContent = 'Jira Best Practices & Help';
+                    document.getElementById('mainTitle').textContent = 'Jira Best Practices & Guidelines';
+                    trackPageView('Best Practices');
                     loadHelpContent('all'); // Load default content
-                } else if (text === 'Label Manager') {
-                    document.getElementById('labelManagerSection').style.display = 'block';
-                    document.getElementById('mainTitle').textContent = 'Label Manager';
+                } else if (text === 'SprintCross') {
+                    document.getElementById('sprintCrossSection').style.display = 'block';
+                    document.getElementById('mainTitle').textContent = 'SprintCross';
+                    trackPageView('SprintCross');
                 }
             });
         });
@@ -2194,6 +2189,7 @@
         const extractedBoardInfo = document.getElementById('extractedBoardInfo');
         const generateSprintReportBtn = document.getElementById('generateSprintReportBtn');
         const downloadSprintReportCsvBtn = document.getElementById('downloadSprintReportCsvBtn');
+        const shareSprintReportBtn = document.getElementById('shareSprintReportBtn');
         const sprintReportLoading = document.getElementById('sprintReportLoading');
         const sprintReportError = document.getElementById('sprintReportError');
         const sprintReportTableWrapper = document.getElementById('sprintReportTableWrapper');
@@ -2226,39 +2222,102 @@
             return null;
         }
 
-        function handleBoardIdExtraction() {
+        // Board ID extraction now handled automatically
+
+        // Extract button removed - now handled automatically
+        
+        sprintBoardInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                // Trigger the Generate Report button click if it's enabled
+                if (!generateSprintReportBtn.disabled) {
+                    generateSprintReportBtn.click();
+                }
+            }
+        });
+
+        // Clear sprint report data when board input changes
+        function clearSprintReportData() {
+            // Clear stored data
+            currentSprintReportData = null;
+            
+            // Clear extracted board ID
+            extractedBoardId = null;
+            document.getElementById('extractedBoardId').textContent = '';
+            
+            // Hide the board extraction success message
+            const boardExtractionSuccess = document.querySelector('.alert-success');
+            if (boardExtractionSuccess) {
+                boardExtractionSuccess.style.display = 'none';
+            }
+            
+            // Hide/clear all sprint report UI elements
+            sprintReportLoading.style.display = 'none';
+            sprintReportError.style.display = 'none';
+            sprintReportTableWrapper.style.display = 'none';
+            
+            // Clear table content
+            sprintReportTableHead.innerHTML = '';
+            sprintReportTableBody.innerHTML = '';
+            
+            // Disable buttons
+            downloadSprintReportCsvBtn.disabled = true;
+            shareSprintReportBtn.disabled = true;
+                            // Keep AI Insights button enabled for accessibility
+            
+            // Destroy existing charts if they exist
+            if (typeof completionTrendChartInstance !== 'undefined' && completionTrendChartInstance) {
+                completionTrendChartInstance.destroy();
+                completionTrendChartInstance = null;
+            }
+            if (typeof scopeChangesChartInstance !== 'undefined' && scopeChangesChartInstance) {
+                scopeChangesChartInstance.destroy();
+                scopeChangesChartInstance = null;
+            }
+            if (typeof velocityChartInstance !== 'undefined' && velocityChartInstance) {
+                velocityChartInstance.destroy();
+                velocityChartInstance = null;
+            }
+            
+            // Clear any progress text
+            const progressText = sprintReportLoading.querySelector('p');
+            if (progressText) {
+                progressText.textContent = '';
+            }
+            
+            console.log('Sprint report data cleared due to board input change');
+        }
+
+        // Enable/disable Generate Report button based on input and auto-enable when valid input is entered
+        sprintBoardInput.addEventListener('input', function() {
+            const input = this.value.trim();
+            if (input) {
+                const boardId = extractBoardIdFromUrl(input);
+                generateSprintReportBtn.disabled = !boardId;
+                if (boardId) {
+                    sprintReportError.style.display = 'none';
+                }
+            } else {
+                generateSprintReportBtn.disabled = true;
+            }
+            
+            
+            // Clear sprint report data when user starts typing/changing the board input
+            if (currentSprintReportData || sprintReportTableWrapper.style.display !== 'none') {
+                clearSprintReportData();
+            }
+        });
+
+        generateSprintReportBtn.addEventListener('click', async function() {
+            // Extract board ID automatically from input
             const input = sprintBoardInput.value.trim();
             if (!input) {
                 alert('Please enter a Jira board URL or board ID');
                 return;
             }
             
-            const boardId = extractBoardIdFromUrl(input);
-            if (boardId) {
-                extractedBoardId = boardId;
-                document.getElementById('extractedBoardId').textContent = boardId;
-                extractedBoardInfo.style.display = 'block';
-                generateSprintReportBtn.disabled = false;
-                sprintReportError.style.display = 'none';
-            } else {
-                extractedBoardInfo.style.display = 'none';
-                generateSprintReportBtn.disabled = true;
-                sprintReportError.textContent = 'Could not extract board ID from the provided input. Please check the URL format or enter a valid board ID.';
-                sprintReportError.style.display = 'block';
-            }
-        }
-
-        extractBoardIdBtn.addEventListener('click', handleBoardIdExtraction);
-        
-        sprintBoardInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                handleBoardIdExtraction();
-            }
-        });
-
-        generateSprintReportBtn.addEventListener('click', async function() {
+            const extractedBoardId = extractBoardIdFromUrl(input);
             if (!extractedBoardId) {
-                alert('Please extract a board ID first');
+                alert('Could not extract board ID from the provided input. Please check the URL format or enter a valid board ID.');
                 return;
             }
             
@@ -2267,32 +2326,105 @@
             sprintReportTableWrapper.style.display = 'none';
             downloadSprintReportCsvBtn.disabled = true;
             
+            // Clear previous data
+            let streamingReport = [];
+            let progressText = sprintReportLoading.querySelector('p') || document.createElement('p');
+            if (!sprintReportLoading.querySelector('p')) {
+                sprintReportLoading.appendChild(progressText);
+            }
+            progressText.textContent = 'Starting sprint analysis...';
+            
             try {
-                const res = await fetch(`/api/jira_sprint_report?board_id=${extractedBoardId}`);
-                const data = await res.json();
-                if (data.error) throw new Error(data.error);
-                renderSprintReportTable(data.report);
-                downloadSprintReportCsvBtn.disabled = false;
-                shareSprintReportBtn.disabled = false;
+                // Use EventSource for streaming
+                const eventSource = new EventSource(`/api/jira_sprint_report_stream?board_id=${extractedBoardId}`);
                 
-                // Store sprint report data for sharing
-                currentSprintReportData = {
-                    report: data.report,
-                    board_id: extractedBoardId,
-                    generated_at: new Date().toISOString(),
-                    type: 'sprint_report'
+                eventSource.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        switch(data.type) {
+                            case 'start':
+                                progressText.textContent = `Starting analysis of ${data.total_expected} sprints...`;
+                                break;
+                                
+                            case 'progress':
+                                if (data.current && data.total) {
+                                    progressText.textContent = `${data.message} (${data.current}/${data.total})`;
+                                } else {
+                                    progressText.textContent = data.message;
+                                }
+                                break;
+                                
+                            case 'sprint_result':
+                                // Add sprint result to our growing report
+                                streamingReport.push(data.data);
+                                
+                                // Just show progress, don't update table yet
+                                progressText.textContent = `Analyzed sprint: ${data.data['Sprint Name']} (${streamingReport.length}/15 completed)`;
+                                break;
+                                
+                            case 'complete':
+                                progressText.textContent = 'Analysis complete! Rendering results...';
+                                eventSource.close();
+                                
+                                // Now render the complete table with all results
+                                renderSprintReportTable(streamingReport);
+                                sprintReportTableWrapper.style.display = '';
+                                
+                                // Enable buttons
+                                downloadSprintReportCsvBtn.disabled = false;
+                                shareSprintReportBtn.disabled = false;
+                                document.getElementById('generateAIInsightsBtn').disabled = false;
+                                
+                                // Store final sprint report data for sharing
+                                currentSprintReportData = {
+                                    report: streamingReport,
+                                    board_id: extractedBoardId,
+                                    generated_at: new Date().toISOString(),
+                                    type: 'sprint_report'
+                                };
+                                
+                                // Hide loading after a brief delay
+                                setTimeout(() => {
+                                    sprintReportLoading.style.display = 'none';
+                                }, 1000);
+                                break;
+                                
+                            case 'error':
+                                throw new Error(data.error);
+                        }
+                    } catch (parseError) {
+                        console.error('Error parsing streaming data:', parseError);
+                        progressText.textContent = 'Error processing streaming data';
+                    }
                 };
+                
+                eventSource.onerror = function(event) {
+                    console.error('EventSource error:', event);
+                    eventSource.close();
+                    sprintReportError.textContent = 'Connection error during streaming. Please try again.';
+                    sprintReportError.style.display = 'block';
+                    sprintReportLoading.style.display = 'none';
+                };
+                
             } catch (err) {
-                sprintReportError.textContent = err.message || 'Failed to load sprint report.';
+                sprintReportError.textContent = err.message || 'Failed to start sprint report streaming.';
                 sprintReportError.style.display = 'block';
-            } finally {
                 sprintReportLoading.style.display = 'none';
             }
         });
 
         downloadSprintReportCsvBtn.addEventListener('click', async function() {
+            // Extract board ID automatically from input
+            const input = sprintBoardInput.value.trim();
+            if (!input) {
+                alert('Please enter a Jira board URL or board ID');
+                return;
+            }
+            
+            const extractedBoardId = extractBoardIdFromUrl(input);
             if (!extractedBoardId) {
-                alert('Please extract a board ID first');
+                alert('Could not extract board ID from the provided input. Please check the URL format or enter a valid board ID.');
                 return;
             }
             
@@ -2362,6 +2494,9 @@
             }
         });
 
+        // Store the original sprint report data for filtering
+        let originalSprintReportData = [];
+
         function renderSprintReportTable(report) {
             if (!Array.isArray(report) || !report.length) {
                 sprintReportTableBody.innerHTML = '<tr><td colspan="10" class="text-center">No data available.</td></tr>';
@@ -2369,6 +2504,10 @@
                 sprintReportTableWrapper.style.display = '';
                 return;
             }
+            
+            // Store the original data for filtering
+            originalSprintReportData = [...report];
+            
             // Define the desired column order
             const headers = [
                 "Sprint Name",
@@ -2383,14 +2522,65 @@
                 "Insight",
                 "Status"
             ];
-            sprintReportTableHead.innerHTML = headers.map(h => `<th>${h}</th>`).join('');
-            sprintReportTableBody.innerHTML = report.map(row =>
-                `<tr>${headers.map(h => `<td>${row[h]}</td>`).join('')}</tr>`
-            ).join('');
-            sprintReportTableWrapper.style.display = '';
+            
+            // Render the table with all data initially
+            renderFilteredSprintTable(report, headers);
+            
+            // Update filter counts
+            updateSprintFilterCounts(report.length, report.length);
             
             // Render charts after table is displayed
             renderSprintCharts(report);
+        }
+
+        function renderFilteredSprintTable(filteredReport, headers) {
+            sprintReportTableHead.innerHTML = headers.map(h => `<th>${h}</th>`).join('');
+            sprintReportTableBody.innerHTML = filteredReport.map(row =>
+                `<tr>${headers.map(h => `<td>${row[h]}</td>`).join('')}</tr>`
+            ).join('');
+            sprintReportTableWrapper.style.display = '';
+        }
+
+        function updateSprintFilterCounts(filteredCount, totalCount) {
+            document.getElementById('sprintFilterCount').textContent = filteredCount;
+            document.getElementById('sprintTotalCount').textContent = totalCount;
+        }
+
+        function filterSprintReport(searchTerm) {
+            if (!originalSprintReportData.length) return;
+            
+            const headers = [
+                "Sprint Name",
+                "Start Date",
+                "End Date",
+                "Initial Planned",
+                "Completed",
+                "Not Completed",
+                "Added During Sprint",
+                "Removed During Sprint",
+                "Completion %",
+                "Insight",
+                "Status"
+            ];
+            
+            let filteredData = originalSprintReportData;
+            
+            if (searchTerm && searchTerm.trim() !== '') {
+                const searchLower = searchTerm.toLowerCase().trim();
+                filteredData = originalSprintReportData.filter(row => {
+                    const sprintName = row["Sprint Name"] ? row["Sprint Name"].toLowerCase() : '';
+                    return sprintName.includes(searchLower);
+                });
+            }
+            
+            // Render the filtered table
+            renderFilteredSprintTable(filteredData, headers);
+            
+            // Update filter counts
+            updateSprintFilterCounts(filteredData.length, originalSprintReportData.length);
+            
+            // Re-render charts with filtered data
+            renderSprintCharts(filteredData);
         }
 
         // Store chart instances to manage them
@@ -2449,11 +2639,7 @@
                             }
                         }
                     },
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    }
+                   
                 }
             });
 
@@ -2518,18 +2704,7 @@
                             beginAtZero: true
                         }
                     },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                afterLabel: function(context) {
-                                    const dataIndex = context.dataIndex;
-                                    const total = completed[dataIndex] + notCompleted[dataIndex];
-                                    const percentage = total > 0 ? ((context.parsed.y / total) * 100).toFixed(1) : 0;
-                                    return `${percentage}% of total`;
-                                }
-                            }
-                        }
-                    }
+                   
                 }
             });
         }
@@ -2669,27 +2844,22 @@
 
         // Display capacity analysis results
         function displayCapacityResults(result) {
-            // Update overview metrics
-            document.getElementById('avgCompletedWeek').textContent = result.metrics.avg_completed_per_week.toFixed(1);
-            document.getElementById('completionRate').textContent = (result.metrics.completion_rate * 100).toFixed(1) + '%';
-            document.getElementById('avgHoursWeek').textContent = result.metrics.avg_hours_per_week.toFixed(1) + 'h';
-            document.getElementById('totalIssuesAnalyzed').textContent = result.total_issues_analyzed;
+            // Ensure results section is visible before updating contents
+            capacityAnalysisResults.style.display = 'block';
+            // Defensive: check for required elements and log if missing
+            const avgCompletedWeekEl = document.getElementById('avgCompletedWeek');
+            const completionRateEl = document.getElementById('completionRate');
+            const avgHoursWeekEl = document.getElementById('avgHoursWeek');
+            const totalIssuesAnalyzedEl = document.getElementById('totalIssuesAnalyzed');
+            if (!avgCompletedWeekEl) { console.error('Missing element: avgCompletedWeek'); return; }
+            if (!completionRateEl) { console.error('Missing element: completionRate'); return; }
+            if (!avgHoursWeekEl) { console.error('Missing element: avgHoursWeek'); return; }
+            if (!totalIssuesAnalyzedEl) { console.error('Missing element: totalIssuesAnalyzed'); return; }
             
-            // Update overall rating badge
-            const ratingBadge = document.getElementById('overallRatingBadge');
-            ratingBadge.textContent = result.overall_rating;
-            
-            // Set badge color based on rating
-            ratingBadge.className = 'badge fs-6 ';
-            if (result.overall_rating.includes('Excellent')) {
-                ratingBadge.className += 'bg-success';
-            } else if (result.overall_rating.includes('Good')) {
-                ratingBadge.className += 'bg-primary';
-            } else if (result.overall_rating.includes('Average')) {
-                ratingBadge.className += 'bg-warning text-dark';
-            } else {
-                ratingBadge.className += 'bg-danger';
-            }
+            avgCompletedWeekEl.textContent = result.metrics.avg_completed_per_week.toFixed(1);
+            completionRateEl.textContent = (result.metrics.completion_rate * 100).toFixed(1) + '%';
+            avgHoursWeekEl.textContent = result.metrics.avg_hours_per_week.toFixed(1) + 'h';
+            totalIssuesAnalyzedEl.textContent = result.total_issues_analyzed;
             
             // Update JIRA links
             const jiraLink = document.getElementById('viewInJiraLink');
@@ -2724,9 +2894,6 @@
             
             // Render weekly performance chart
             renderWeeklyPerformanceChart(result.weekly_summary);
-            
-            // Show results section
-            capacityAnalysisResults.style.display = 'block';
         }
 
         // Display issue breakdown
@@ -2925,9 +3092,10 @@
 
         // Share capacity report
         const shareCapacityReportBtn = document.getElementById('shareCapacityReportBtn');
-        const shareSprintReportBtn = document.getElementById('shareSprintReportBtn');
         let currentReportData = null;
         let currentSprintReportData = null;
+        let analyticsSessionId = null;
+        let analyticsCharts = {};
 
         shareCapacityReportBtn.addEventListener('click', function() {
             if (!currentCapacityTaskId || !currentReportData) {
@@ -3037,7 +3205,6 @@
                     <div class="col-md-6">
                         <p><strong>User:</strong> ${reportData.user_email}</p>
                         <p><strong>Analysis Period:</strong> ${reportData.analysis_period}</p>
-                        <p><strong>Overall Rating:</strong> <span class="badge bg-primary">${reportData.overall_rating}</span></p>
                     </div>
                     <div class="col-md-6">
                         <p><strong>Completion Rate:</strong> ${(reportData.metrics.completion_rate * 100).toFixed(1)}%</p>
@@ -3530,6 +3697,30 @@ _Generated by JIRA Sprint Analysis Tool_`;
                 saveAllSettings();
             });
 
+            // Sprint Search Functionality
+            const sprintSearchInput = document.getElementById('sprintSearchInput');
+            const clearSprintSearchBtn = document.getElementById('clearSprintSearchBtn');
+
+            // Search input event listener
+            sprintSearchInput.addEventListener('input', function() {
+                const searchTerm = this.value;
+                filterSprintReport(searchTerm);
+            });
+
+            // Clear search button event listener
+            clearSprintSearchBtn.addEventListener('click', function() {
+                sprintSearchInput.value = '';
+                filterSprintReport('');
+            });
+
+            // Enter key to clear search
+            sprintSearchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    this.value = '';
+                    filterSprintReport('');
+                }
+            });
+
             // Theme change handler
             document.querySelectorAll('input[name="theme"]').forEach(radio => {
                 radio.addEventListener('change', function() {
@@ -3544,7 +3735,7 @@ _Generated by JIRA Sprint Analysis Tool_`;
 
             // Apply default view on page load
             const defaultView = localStorage.getItem('defaultView');
-            if (defaultView && defaultView !== 'label-manager') {
+            if (defaultView) {
                 // Find the corresponding navigation link and trigger click
                 const navLinks = document.querySelectorAll('.sidebar .nav-link');
                 navLinks.forEach(link => {
@@ -3939,15 +4130,82 @@ _Generated by JIRA Sprint Analysis Tool_`;
                     document.getElementById('jiraUrl').value = settings.url || '';
                     document.getElementById('jiraEmail').value = settings.email || '';
                     
-                    // Show indicator if token is saved
+                    const tokenInput = document.getElementById('jiraApiToken');
+                    const tokenStatus = document.getElementById('tokenStatus');
+                    const editButton = document.getElementById('editApiToken');
+                    const maskedTokenText = document.getElementById('maskedTokenText');
+                    
+                    // Show token status without revealing the actual token
                     if (settings.has_token) {
-                        document.getElementById('jiraApiToken').placeholder = 'Token saved (enter new token to update)';
+                        // Hide the input and show status
+                        tokenInput.style.display = 'none';
+                        tokenInput.value = ''; // Clear any previous value
+                        document.getElementById('toggleApiToken').style.display = 'none';
+                        tokenStatus.style.display = 'block';
+                        editButton.style.display = 'block';
+                        
+                        // Set masked token
+                        if (settings.masked_token) {
+                            maskedTokenText.textContent = settings.masked_token;
+                        }
+                        
+                        // Show creation/update info if available
+                        if (settings.updated_at) {
+                            const updateDate = new Date(settings.updated_at).toLocaleDateString();
+                            const statusText = document.querySelector('#tokenStatus small');
+                            statusText.innerHTML += ` (Updated: ${updateDate})`;
+                        }
+                    } else {
+                        // Show input for new token
+                        tokenInput.style.display = 'block';
+                        tokenInput.placeholder = 'Enter your JIRA API token';
+                        document.getElementById('toggleApiToken').style.display = 'block';
+                        tokenStatus.style.display = 'none';
+                        editButton.style.display = 'none';
                     }
                 }
             } catch (error) {
                 console.error('Error loading JIRA settings:', error);
             }
         }
+
+        // Event handlers for token management
+        document.addEventListener('DOMContentLoaded', function() {
+            // Show/hide masked token
+            document.getElementById('showMaskedToken').addEventListener('click', function() {
+                const display = document.getElementById('maskedTokenDisplay');
+                if (display.style.display === 'none') {
+                    display.style.display = 'block';
+                    this.textContent = 'Hide masked token';
+                } else {
+                    display.style.display = 'none';
+                    this.textContent = 'Show masked token';
+                }
+            });
+
+            // Edit token button
+            document.getElementById('editApiToken').addEventListener('click', function() {
+                const tokenInput = document.getElementById('jiraApiToken');
+                const tokenStatus = document.getElementById('tokenStatus');
+                const editButton = document.getElementById('editApiToken');
+                
+                // Show input for editing
+                tokenInput.style.display = 'block';
+                tokenInput.placeholder = 'Enter new API token';
+                tokenInput.focus();
+                document.getElementById('toggleApiToken').style.display = 'block';
+                
+                // Hide status temporarily
+                tokenStatus.style.display = 'none';
+                editButton.style.display = 'none';
+            });
+
+            // Reset form when modal is closed
+            document.getElementById('settingsModal').addEventListener('hidden.bs.modal', function() {
+                // Reload settings to reset any unsaved changes
+                loadJiraSettings();
+            });
+        });
 
         function loadSettings() {
             // JIRA settings are loaded separately when modal opens
@@ -4869,6 +5127,1720 @@ _Generated by JIRA Sprint Analysis Tool_`;
                 });
             });
         });
+
+        // Analytics functionality
+        async function initializeAnalytics() {
+            try {
+                const response = await fetch('/api/analytics/session/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    analyticsSessionId = data.session_id;
+                    
+                    // Track initial page view
+                    trackPageView('Sprint Report');
+                    
+                    // Set up automatic tracking
+                    trackUserInteractions();
+                    
+                    console.log('Analytics initialized successfully with optimized tracking');
+                    console.log('- Button clicks: 1 second cooldown, important buttons only');
+                    console.log('- Page views: 2 second cooldown, duplicate prevention');
+                    console.log('- Batch processing: 500ms debounce, deduplication');
+                } else {
+                    console.warn('Failed to initialize analytics');
+                }
+            } catch (error) {
+                console.warn('Analytics initialization error:', error);
+            }
+        }
+
+        // Debouncing to prevent excessive analytics calls
+        let trackingQueue = new Map();
+        let trackingTimer = null;
+
+        function trackEvent(eventType, data) {
+            if (!analyticsSessionId) return;
+            
+            try {
+                // Create a unique key for deduplication
+                const eventKey = `${eventType}_${JSON.stringify(data)}`;
+                
+                // Add to queue instead of sending immediately
+                trackingQueue.set(eventKey, {
+                    session_id: analyticsSessionId,
+                    event_type: eventType,
+                    ...data
+                });
+                
+                // Debounce: only send after 500ms of no new events
+                clearTimeout(trackingTimer);
+                trackingTimer = setTimeout(flushTrackingQueue, 500);
+                
+            } catch (error) {
+                console.warn('Analytics tracking error:', error);
+            }
+        }
+
+        function flushTrackingQueue() {
+            if (trackingQueue.size === 0) return;
+            
+            // Send only the most recent unique events
+            const eventsToSend = Array.from(trackingQueue.values());
+            const eventCount = eventsToSend.length;
+            trackingQueue.clear();
+            
+            console.log(`📊 Sending ${eventCount} analytics events in batch`);
+            
+            // Send in batch to reduce API calls
+            fetch('/api/analytics/track', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    events: eventsToSend
+                })
+            }).then(response => response.json())
+            .then(data => {
+                console.log(`✅ Analytics batch processed: ${data.processed_count}/${data.total_events} events`);
+            }).catch(error => {
+                console.warn('Analytics batch tracking error:', error);
+            });
+        }
+
+        let lastPageView = '';
+        let lastPageViewTime = 0;
+        let pageViewCooldown = 2000; // 2 seconds cooldown between page views
+
+        function trackPageView(pageName) {
+            // Prevent duplicate page views within cooldown period
+            const now = Date.now();
+            if (pageName === lastPageView && now - lastPageViewTime < pageViewCooldown) {
+                return;
+            }
+            
+            lastPageView = pageName;
+            lastPageViewTime = now;
+            
+            trackEvent('page_view', {
+                page_name: pageName,
+                url: window.location.href
+            });
+        }
+
+        function trackButtonClick(buttonElement, featureName) {
+            const buttonText = buttonElement.textContent.trim();
+            const buttonId = buttonElement.id || 'unknown';
+            
+            trackEvent('button_click', {
+                button_id: buttonId,
+                button_text: buttonText,
+                feature_name: featureName
+            });
+        }
+
+        function trackFeatureUsage(featureName, action, metadata = {}) {
+            trackEvent('feature_usage', {
+                feature_name: featureName,
+                action: action,
+                metadata: metadata
+            });
+        }
+
+        function trackPerformanceMetric(metricName, value, metadata = {}) {
+            trackEvent('performance_metric', {
+                metric_name: metricName,
+                value: value,
+                metadata: metadata
+            });
+        }
+
+        let lastButtonClickTime = 0;
+        let buttonClickCooldown = 1000; // 1 second cooldown between button clicks
+
+        function trackUserInteractions() {
+            // Track important button clicks only (with cooldown to prevent spam)
+            document.addEventListener('click', function(event) {
+                if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
+                    const button = event.target.tagName === 'BUTTON' ? event.target : event.target.closest('button');
+                    
+                    // Skip if this is a rapid-fire click (less than 1 second since last click)
+                    const now = Date.now();
+                    if (now - lastButtonClickTime < buttonClickCooldown) {
+                        return;
+                    }
+                    lastButtonClickTime = now;
+                    
+                    // Only track important buttons, not every single button
+                    if (button.id && (
+                        button.id.includes('generate') ||
+                        button.id.includes('extract') ||
+                        button.id.includes('download') ||
+                        button.id.includes('share') ||
+                        button.classList.contains('nav-link')
+                    )) {
+                        // Determine feature name based on button context
+                        let featureName = 'Unknown';
+                        if (button.closest('#sprintReportSection')) {
+                            featureName = 'Sprint Report';
+                        
+                        } else if (button.closest('#capacityPlanningSection')) {
+                            featureName = 'Capacity Planning';
+                        } else if (button.closest('#analyticsSection')) {
+                            featureName = 'Analytics';
+                        } else if (button.closest('#settingsModal')) {
+                            featureName = 'Settings';
+                        } else if (button.classList.contains('nav-link')) {
+                            featureName = 'Navigation';
+                        }
+                        
+                        trackButtonClick(button, featureName);
+                    }
+                }
+            });
+        }
+
+        async function loadAnalyticsData() {
+            try {
+                const timeRange = document.getElementById('analyticsTimeRange').value;
+                const response = await fetch(`/api/analytics/summary?days_back=${timeRange}`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load analytics data');
+                }
+                
+                const data = await response.json();
+                updateAnalyticsDashboard(data);
+                
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+                showAnalyticsError('Failed to load analytics data');
+            }
+        }
+
+        function updateAnalyticsDashboard(data) {
+            // Update summary cards
+            document.getElementById('totalUsersCount').textContent = data.summary.unique_users;
+            document.getElementById('totalSessionsCount').textContent = data.summary.total_sessions;
+            document.getElementById('totalClicksCount').textContent = data.summary.total_button_clicks;
+            document.getElementById('engagementScore').textContent = data.engagement_score;
+            
+            // Update feature usage chart
+            updateFeatureUsageChart(data.top_features);
+            
+            // Update daily activity chart
+            updateDailyActivityChart(data.daily_activity);
+            
+            // Update tables
+            updateTopButtonsTable(data.top_buttons, data.summary.total_button_clicks);
+            updateTopPagesTable(data.top_pages, data.summary.total_page_views);
+            
+            // Update performance metrics
+            updatePerformanceMetrics(data.performance_metrics);
+        }
+
+        function updateFeatureUsageChart(featureData) {
+            const ctx = document.getElementById('featureUsageChart').getContext('2d');
+            
+            // Destroy existing chart
+            if (analyticsCharts.featureUsage) {
+                analyticsCharts.featureUsage.destroy();
+            }
+            
+            const labels = Object.keys(featureData);
+            const values = Object.values(featureData);
+            
+            analyticsCharts.featureUsage = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: [
+                            '#FF6384',
+                            '#36A2EB',
+                            '#FFCE56',
+                            '#4BC0C0',
+                            '#9966FF',
+                            '#FF9F40'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateDailyActivityChart(dailyData) {
+            const ctx = document.getElementById('dailyActivityChart').getContext('2d');
+            
+            // Destroy existing chart
+            if (analyticsCharts.dailyActivity) {
+                analyticsCharts.dailyActivity.destroy();
+            }
+            
+            const sortedDates = Object.keys(dailyData).sort();
+            const sessions = sortedDates.map(date => dailyData[date].sessions);
+            const clicks = sortedDates.map(date => dailyData[date].button_clicks);
+            const users = sortedDates.map(date => dailyData[date].unique_users);
+            
+            analyticsCharts.dailyActivity = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedDates,
+                    datasets: [
+                        {
+                            label: 'Sessions',
+                            data: sessions,
+                            borderColor: '#36A2EB',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            fill: true
+                        },
+                        {
+                            label: 'Button Clicks',
+                            data: clicks,
+                            borderColor: '#FF6384',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            fill: false
+                        },
+                        {
+                            label: 'Unique Users',
+                            data: users,
+                            borderColor: '#4BC0C0',
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTopButtonsTable(buttonData, totalClicks) {
+            const tbody = document.getElementById('topButtonsTable');
+            tbody.innerHTML = '';
+            
+            if (Object.keys(buttonData).length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No data available</td></tr>';
+                return;
+            }
+            
+            Object.entries(buttonData).forEach(([button, clicks]) => {
+                const percentage = ((clicks / totalClicks) * 100).toFixed(1);
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${button}</td>
+                    <td>${clicks}</td>
+                    <td>${percentage}%</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updateTopPagesTable(pageData, totalViews) {
+            const tbody = document.getElementById('topPagesTable');
+            tbody.innerHTML = '';
+            
+            if (Object.keys(pageData).length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No data available</td></tr>';
+                return;
+            }
+            
+            Object.entries(pageData).forEach(([page, views]) => {
+                const percentage = ((views / totalViews) * 100).toFixed(1);
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${page}</td>
+                    <td>${views}</td>
+                    <td>${percentage}%</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updatePerformanceMetrics(metricsData) {
+            const container = document.getElementById('performanceMetrics');
+            
+            if (Object.keys(metricsData).length === 0) {
+                container.innerHTML = '<div class="text-center text-muted">No performance data available</div>';
+                return;
+            }
+            
+            let html = '<div class="row">';
+            Object.entries(metricsData).forEach(([metric, data]) => {
+                html += `
+                    <div class="col-md-3 mb-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">${metric.replace(/_/g, ' ').toUpperCase()}</h6>
+                                <div class="mb-2">
+                                    <small class="text-muted">Average:</small>
+                                    <div class="h5">${data.average.toFixed(2)}ms</div>
+                                </div>
+                                <div class="d-flex justify-content-between small">
+                                    <span>Min: ${data.min.toFixed(2)}ms</span>
+                                    <span>Max: ${data.max.toFixed(2)}ms</span>
+                                </div>
+                                <div class="small text-muted">Samples: ${data.count}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        function showAnalyticsError(message) {
+            const container = document.getElementById('analyticsSummaryCards');
+            container.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-warning" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${message}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Analytics event listeners
+        const analyticsTimeRange = document.getElementById('analyticsTimeRange');
+        const refreshAnalyticsBtn = document.getElementById('refreshAnalyticsBtn');
+        
+        if (analyticsTimeRange) {
+            analyticsTimeRange.addEventListener('change', loadAnalyticsData);
+        }
+        if (refreshAnalyticsBtn) {
+            refreshAnalyticsBtn.addEventListener('click', loadAnalyticsData);
+        }
+
+        // Initialize analytics when page loads - TEMPORARILY DISABLED
+        // document.addEventListener('DOMContentLoaded', function() {
+        //     initializeAnalytics();
+        // });
+
+        // Track feature usage for existing functionality
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            const url = args[0];
+            const startTime = performance.now();
+            
+            return originalFetch.apply(this, args).then(response => {
+                const endTime = performance.now();
+                const duration = endTime - startTime;
+                
+                // Track API performance
+                if (url.includes('/api/')) {
+                    const apiEndpoint = url.split('/api/')[1].split('?')[0];
+                    trackPerformanceMetric(`api_${apiEndpoint}`, duration);
+                }
+                
+                return response;
+            });
+        };
+
+        // AI Insights functionality
+        let currentSprintDataForAI = null;
+
+        // Generate AI Insights - Moved to DOMContentLoaded event handler
+
+        // Regenerate insights button
+        const regenerateInsightsBtn = document.getElementById('regenerateInsightsBtn');
+        if (regenerateInsightsBtn) {
+            regenerateInsightsBtn.addEventListener('click', async function() {
+                if (currentSprintReportData && currentSprintReportData.report) {
+                    await generateAIInsights(currentSprintReportData.report);
+                }
+            });
+        }
+
+        async function generateAIInsights(sprintData) {
+            const loadingEl = document.getElementById('aiInsightsLoading');
+            const errorEl = document.getElementById('aiInsightsError');
+            const resultsEl = document.getElementById('aiInsightsResults');
+            const button = document.getElementById('generateAIInsightsBtn');
+            const regenerateBtn = document.getElementById('regenerateInsightsBtn');
+
+            // Reset states
+            loadingEl.style.display = '';
+            errorEl.style.display = 'none';
+            resultsEl.style.display = 'none';
+            regenerateBtn.style.display = 'none';
+            button.disabled = true;
+
+            try {
+                const response = await fetch('/api/sprint/ai-insights', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sprint_data: sprintData
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    displayAIInsights(data.insights);
+                    resultsEl.style.display = '';
+                    regenerateBtn.style.display = '';
+                    showToast('AI insights generated successfully!', 'success');
+                } else {
+                    throw new Error(data.error || 'Failed to generate insights');
+                }
+            } catch (error) {
+                console.error('AI Insights error:', error);
+                if (error.message.includes('OpenAI') || error.message.includes('API key')) {
+                    errorEl.style.display = '';
+                } else {
+                    errorEl.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <div>
+                                <strong>Analysis Failed</strong>
+                                <p class="mb-0">${error.message}</p>
+                            </div>
+                        </div>
+                    `;
+                    errorEl.style.display = '';
+                }
+            } finally {
+                loadingEl.style.display = 'none';
+                button.disabled = false;
+            }
+        }
+
+        function displayAIInsights(insights) {
+            const insightsList = document.getElementById('aiInsightsList');
+            const overallAssessment = document.getElementById('overallAssessment');
+            const keyObservations = document.getElementById('keyObservations');
+
+            // Clear previous content
+            insightsList.innerHTML = '';
+            keyObservations.innerHTML = '';
+
+            // Display overall assessment
+            overallAssessment.innerHTML = `
+                <p class="mb-0">${insights.overall_assessment}</p>
+            `;
+
+            // Display insights in a clean modal format
+            if (insights.insights && insights.insights.length > 0) {
+                insights.insights.forEach((insight, index) => {
+                    const impactBadge = insight.impact === 'High' ? 'danger' : 
+                                       insight.impact === 'Medium' ? 'warning' : 'info';
+                    
+                    const categoryIcon = insight.category === 'Planning' ? 'calendar-alt' :
+                                        insight.category === 'Execution' ? 'play-circle' :
+                                        insight.category === 'Team' ? 'users' : 'cogs';
+
+                    insightsList.innerHTML += `
+                        <div class="card mb-3 border-start border-${impactBadge} border-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0 text-primary">
+                                        <i class="fas fa-${categoryIcon} me-2"></i>${insight.title}
+                                    </h6>
+                                    <div class="d-flex gap-1">
+                                        <span class="badge bg-light text-dark">${insight.category}</span>
+                                        <span class="badge bg-${impactBadge}">${insight.impact}</span>
+                                    </div>
+                                </div>
+                                <p class="card-text text-dark">${insight.description}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // Display key observations
+            if (insights.key_observations && insights.key_observations.length > 0) {
+                insights.key_observations.forEach(observation => {
+                    keyObservations.innerHTML += `<li>${observation}</li>`;
+                });
+            }
+
+            // Show if fallback was used
+            if (insights.fallback) {
+                overallAssessment.innerHTML += `
+                    <small class="text-muted mt-2 d-block">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Basic analysis used (OpenAI not available)
+                    </small>
+                `;
+                
+                // Show debug information if available
+                if (insights.raw_openai_response) {
+                    overallAssessment.innerHTML += `
+                        <div class="mt-3 p-3 bg-light border rounded">
+                            <h6 class="text-danger mb-2">
+                                <i class="fas fa-bug me-2"></i>Debug Information
+                            </h6>
+                            <div class="mb-2">
+                                <strong>Raw OpenAI Response:</strong>
+                                <pre class="mt-1 p-2 bg-white border rounded" style="font-size: 0.8em; max-height: 200px; overflow-y: auto;">${insights.raw_openai_response}</pre>
+                            </div>
+                            ${insights.error ? `<div class="mb-2"><strong>Error:</strong> ${insights.error}</div>` : ''}
+                            ${insights.json_error ? `<div class="mb-2"><strong>JSON Error:</strong> ${insights.json_error}</div>` : ''}
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        // OpenAI Configuration - Wrap in DOMContentLoaded to ensure elements exist
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔥 OpenAI Configuration: DOMContentLoaded event fired');
+            
+            // Check if elements exist
+            const testBtn = document.getElementById('testOpenaiConnection');
+            const saveBtn = document.getElementById('saveOpenaiConfig');
+            const apiKeyInput = document.getElementById('openaiApiKey');
+            
+            console.log('🔍 OpenAI Elements Check:');
+            console.log('  - Test button:', testBtn ? '✅ Found' : '❌ Missing');
+            console.log('  - Save button:', saveBtn ? '✅ Found' : '❌ Missing');
+            console.log('  - API Key input:', apiKeyInput ? '✅ Found' : '❌ Missing');
+            
+            if (!testBtn) {
+                console.error('❌ CRITICAL: testOpenaiConnection button not found!');
+                alert('ERROR: Test Connection button not found in DOM!');
+                return;
+            }
+            
+            if (!saveBtn) {
+                console.error('❌ CRITICAL: saveOpenaiConfig button not found!');
+                alert('ERROR: Save Configuration button not found in DOM!');
+                return;
+            }
+            
+            if (!apiKeyInput) {
+                console.error('❌ CRITICAL: openaiApiKey input not found!');
+                alert('ERROR: API Key input field not found in DOM!');
+                return;
+            }
+            
+            console.log('✅ All OpenAI elements found, attaching event listeners...');
+            
+            // Test Connection Button
+            testBtn.addEventListener('click', async function() {
+                console.log('🔥 TEST CONNECTION BUTTON CLICKED! 🔥');
+                
+                const apiKey = apiKeyInput.value.trim();
+                console.log('📝 API Key check:', apiKey ? `Present (${apiKey.length} chars)` : 'Empty');
+                
+                if (!apiKey) {
+                    console.warn('⚠️ No API key provided');
+                    showToast('Please enter an OpenAI API key', 'warning');
+                    alert('Please enter an OpenAI API key');
+                    return;
+                }
+
+                const button = this;
+                const originalText = button.innerHTML;
+                console.log('🔄 Starting test connection process...');
+                
+                button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Testing...';
+                button.disabled = true;
+
+                try {
+                    console.log('📡 Making API request to /api/settings/test-openai');
+                    console.log('📤 Request payload:', { api_key: apiKey.substring(0, 10) + '...' });
+                    
+                    const response = await fetch('/api/settings/test-openai', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            api_key: apiKey
+                        })
+                    });
+
+                    console.log('📥 Response status:', response.status);
+                    console.log('📥 Response ok:', response.ok);
+                    
+                    const data = await response.json();
+                    console.log('📥 Response data:', data);
+
+                    if (response.ok) {
+                        console.log('✅ Test connection successful!');
+                        document.getElementById('aiConnectionStatus').innerHTML = `
+                            <div class="text-success">
+                                <i class="fas fa-check-circle me-2"></i>Connection successful
+                            </div>
+                        `;
+                        showToast('OpenAI connection test successful!', 'success');
+                        alert('✅ SUCCESS: OpenAI connection test successful!');
+                    } else {
+                        console.error('❌ Test connection failed:', data.error);
+                        throw new Error(data.error || 'Unknown error');
+                    }
+                } catch (error) {
+                    console.error('💥 Test connection error:', error);
+                    console.error('💥 Error details:', error.message, error.stack);
+                    
+                    document.getElementById('aiConnectionStatus').innerHTML = `
+                        <div class="text-danger">
+                            <i class="fas fa-times-circle me-2"></i>Connection failed
+                        </div>
+                    `;
+                    const errorMsg = 'Connection test failed: ' + error.message;
+                    showToast(errorMsg, 'error');
+                    alert('❌ ERROR: ' + errorMsg);
+                } finally {
+                    console.log('🔄 Resetting button state...');
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                }
+            });
+            
+            console.log('✅ Test connection event listener attached');
+
+            // Save Configuration Button
+            saveBtn.addEventListener('click', async function() {
+                console.log('💾 SAVE CONFIGURATION BUTTON CLICKED! 💾');
+                
+                const apiKey = apiKeyInput.value.trim();
+                console.log('📝 API Key check for save:', apiKey ? `Present (${apiKey.length} chars)` : 'Empty');
+                
+                if (!apiKey) {
+                    console.warn('⚠️ No API key provided for save');
+                    showToast('Please enter an OpenAI API key', 'warning');
+                    alert('Please enter an OpenAI API key');
+                    return;
+                }
+
+                const button = this;
+                const originalText = button.innerHTML;
+                console.log('🔄 Starting save configuration process...');
+                
+                button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+                button.disabled = true;
+
+                try {
+                    console.log('📡 Making API request to /api/settings/save-openai');
+                    console.log('📤 Save request payload:', { api_key: apiKey.substring(0, 10) + '...' });
+                    
+                    const response = await fetch('/api/settings/save-openai', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            api_key: apiKey
+                        })
+                    });
+
+                    console.log('📥 Save response status:', response.status);
+                    console.log('📥 Save response ok:', response.ok);
+                    
+                    const data = await response.json();
+                    console.log('📥 Save response data:', data);
+
+                    if (response.ok) {
+                        console.log('✅ Save configuration successful!');
+                        showToast('OpenAI API key saved successfully!', 'success');
+                        alert('✅ SUCCESS: OpenAI API key saved successfully!');
+                        loadOpenaiConfig(); // Refresh the display
+                        apiKeyInput.value = ''; // Clear the input
+                    } else {
+                        console.error('❌ Save configuration failed:', data.error);
+                        throw new Error(data.error || 'Unknown save error');
+                    }
+                } catch (error) {
+                    console.error('💥 Save configuration error:', error);
+                    console.error('💥 Save error details:', error.message, error.stack);
+                    
+                    const errorMsg = 'Failed to save OpenAI API key: ' + error.message;
+                    showToast(errorMsg, 'error');
+                    alert('❌ ERROR: ' + errorMsg);
+                } finally {
+                    console.log('🔄 Resetting save button state...');
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                }
+            });
+            
+            console.log('✅ Save configuration event listener attached');
+
+            // Toggle API Key Visibility Button
+            const toggleBtn = document.getElementById('toggleOpenaiApiKey');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    console.log('👁️ Toggle API key visibility clicked');
+                    const input = document.getElementById('openaiApiKey');
+                    const icon = this.querySelector('i');
+                    
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        icon.classList.replace('fa-eye', 'fa-eye-slash');
+                        console.log('👁️ API key visibility: SHOWN');
+                    } else {
+                        input.type = 'password';
+                        icon.classList.replace('fa-eye-slash', 'fa-eye');
+                        console.log('👁️ API key visibility: HIDDEN');
+                    }
+                });
+                console.log('✅ Toggle visibility event listener attached');
+            } else {
+                console.warn('⚠️ Toggle API key button not found');
+            }
+
+            // Show Masked Key Button
+            const showMaskedBtn = document.getElementById('showMaskedOpenaiKey');
+            if (showMaskedBtn) {
+                showMaskedBtn.addEventListener('click', function() {
+                    console.log('🔍 Show masked key clicked');
+                    const display = document.getElementById('maskedOpenaiKeyDisplay');
+                    display.style.display = display.style.display === 'none' ? '' : 'none';
+                    console.log('🔍 Masked key display toggled:', display.style.display === 'none' ? 'HIDDEN' : 'SHOWN');
+                });
+                console.log('✅ Show masked key event listener attached');
+            } else {
+                console.warn('⚠️ Show masked key button not found');
+            }
+
+            async function loadOpenaiConfig() {
+                console.log('📥 Loading OpenAI configuration...');
+                try {
+                    const response = await fetch('/api/settings/load-openai');
+                    console.log('📥 Load config response status:', response.status);
+                    
+                    const data = await response.json();
+                    console.log('📥 Load config response data:', data);
+
+                    if (response.ok) {
+                        const statusEl = document.getElementById('openaiKeyStatus');
+                        const maskedTextEl = document.getElementById('maskedOpenaiKeyText');
+                        const connectionStatusEl = document.getElementById('aiConnectionStatus');
+
+                        console.log('🔍 Config elements check:');
+                        console.log('  - Status element:', statusEl ? '✅ Found' : '❌ Missing');
+                        console.log('  - Masked text element:', maskedTextEl ? '✅ Found' : '❌ Missing');
+                        console.log('  - Connection status element:', connectionStatusEl ? '✅ Found' : '❌ Missing');
+
+                        if (data.has_key) {
+                            console.log('🔑 API key is configured');
+                            if (statusEl) statusEl.style.display = '';
+                            if (maskedTextEl) maskedTextEl.textContent = data.masked_key;
+                            
+                            if (data.ai_enabled) {
+                                console.log('✅ AI is enabled and ready');
+                                if (connectionStatusEl) {
+                                    connectionStatusEl.innerHTML = `
+                                        <div class="text-success">
+                                            <i class="fas fa-check-circle me-2"></i>AI Ready
+                                        </div>
+                                    `;
+                                }
+                            } else {
+                                console.log('⚠️ AI key configured but restart required');
+                                if (connectionStatusEl) {
+                                    connectionStatusEl.innerHTML = `
+                                        <div class="text-warning">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>Key configured, restart required
+                                        </div>
+                                    `;
+                                }
+                            }
+                        } else {
+                            console.log('❌ No API key configured');
+                            if (statusEl) statusEl.style.display = 'none';
+                            if (connectionStatusEl) {
+                                connectionStatusEl.innerHTML = `
+                                    <div class="text-muted">
+                                        <i class="fas fa-question-circle me-2"></i>Not configured
+                                    </div>
+                                `;
+                            }
+                        }
+                    } else {
+                        console.error('❌ Failed to load OpenAI config:', data);
+                    }
+                } catch (error) {
+                    console.error('💥 Error loading OpenAI config:', error);
+                    console.error('💥 Load config error details:', error.message, error.stack);
+                }
+            }
+
+            // Load OpenAI config when AI tab is shown
+            const aiConfigTab = document.getElementById('ai-config-tab');
+            if (aiConfigTab) {
+                aiConfigTab.addEventListener('click', function() {
+                    console.log('🎯 AI Configuration tab clicked');
+                    loadOpenaiConfig();
+                });
+                console.log('✅ AI config tab event listener attached');
+            } else {
+                console.warn('⚠️ AI config tab not found');
+            }
+        }); // End of DOMContentLoaded for OpenAI Configuration
+
+
+        
+
+
+        // Global variable to store projects data
+        let allProjectsData = [];
+        let filteredProjectsData = [];
+
+        // Load detailed projects data
+        async function loadProjectsData() {
+            console.log('loadProjectsData called');
+            const loadingEl = document.getElementById('projectsLoading');
+            const errorEl = document.getElementById('projectsError');
+            const tableBody = document.getElementById('projectsTableBody');
+            
+            console.log('Setting loading state');
+            loadingEl.style.display = 'block';
+            errorEl.style.display = 'none';
+            
+            try {
+                console.log('Making API request to /api/projects_detailed');
+                const response = await fetch('/api/projects_detailed');
+                console.log('API response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('API response data:', data);
+                allProjectsData = data.projects || [];
+                filteredProjectsData = [...allProjectsData];
+                
+                console.log(`Loaded ${allProjectsData.length} projects`);
+                updateProjectsTable();
+                updateProjectsCount();
+                
+            } catch (error) {
+                console.error('Error loading projects:', error);
+                errorEl.style.display = 'block';
+                errorEl.textContent = `Failed to load projects: ${error.message}`;
+                
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-danger py-4">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Failed to load projects
+                        </td>
+                    </tr>
+                `;
+            } finally {
+                console.log('Hiding loading state');
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        // Update projects table
+        function updateProjectsTable() {
+            const tableBody = document.getElementById('projectsTableBody');
+            
+            if (filteredProjectsData.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="fas fa-search me-2"></i>No projects found
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tableBody.innerHTML = filteredProjectsData.map(project => {
+                const statusBadge = getStatusBadge(project.status);
+                const daysBadge = getDaysBadge(project.daysSinceActivity);
+                
+                return `
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-sm bg-primary text-white rounded me-2 d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-project-diagram"></i>
+                                </div>
+                                <div>
+                                    <strong>${project.name}</strong>
+                                    <br>
+                                    <small class="text-muted">${project.description}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark font-monospace">${project.key}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">${project.type}</span>
+                        </td>
+                        <td>
+                            <span class="text-muted">${project.lastActivity || 'N/A'}</span>
+                        </td>
+                        <td>${daysBadge}</td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="openProjectInJira('${project.key}')" title="Open in Jira">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </button>
+                                <button class="btn btn-outline-info" onclick="viewProjectDetails('${project.key}')" title="View Details">
+                                    <i class="fas fa-info-circle"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Helper functions for badges
+        function getStatusBadge(status) {
+            const badgeClasses = {
+                'Very Active': 'bg-success',
+                'Active': 'bg-primary',
+                'Moderate': 'bg-warning',
+                'Inactive': 'bg-danger',
+                'Unknown': 'bg-secondary'
+            };
+            
+            return `<span class="badge ${badgeClasses[status] || 'bg-secondary'}">${status}</span>`;
+        }
+
+        function getDaysBadge(days) {
+            if (days === null || days === undefined) {
+                return '<span class="badge bg-secondary">N/A</span>';
+            }
+            
+            let badgeClass = 'bg-secondary';
+            if (days <= 7) badgeClass = 'bg-success';
+            else if (days <= 30) badgeClass = 'bg-primary';
+            else if (days <= 90) badgeClass = 'bg-warning';
+            else badgeClass = 'bg-danger';
+            
+            return `<span class="badge ${badgeClass}">${days} days</span>`;
+        }
+
+        // Update projects count
+        function updateProjectsCount() {
+            const countEl = document.getElementById('projectsCount');
+            countEl.textContent = `${filteredProjectsData.length} of ${allProjectsData.length} projects`;
+        }
+
+        // Filter projects
+        function filterProjects() {
+            const searchTerm = document.getElementById('projectSearchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('projectStatusFilter').value;
+            
+            filteredProjectsData = allProjectsData.filter(project => {
+                const matchesSearch = project.name.toLowerCase().includes(searchTerm) || 
+                                    project.key.toLowerCase().includes(searchTerm) ||
+                                    project.description.toLowerCase().includes(searchTerm);
+                
+                const matchesStatus = statusFilter === 'all' || 
+                                    (statusFilter === 'active' && ['Very Active', 'Active', 'Moderate'].includes(project.status)) ||
+                                    (statusFilter === 'inactive' && project.status === 'Inactive');
+                
+                return matchesSearch && matchesStatus;
+            });
+            
+            updateProjectsTable();
+            updateProjectsCount();
+        }
+
+        // Helper functions for actions
+        function openProjectInJira(projectKey) {
+            // This would need the Jira URL from settings
+            const jiraUrl = 'https://your-domain.atlassian.net'; // This should be dynamic
+            window.open(`${jiraUrl}/projects/${projectKey}`, '_blank');
+        }
+
+        function viewProjectDetails(projectKey) {
+            const project = allProjectsData.find(p => p.key === projectKey);
+            if (project) {
+                alert(`Project: ${project.name}\nKey: ${project.key}\nType: ${project.type}\nLead: ${project.lead}\nLast Activity: ${project.lastActivity}\nStatus: ${project.status}`);
+            }
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // Total Projects card click handler
+            const totalProjectsCard = document.getElementById('totalProjectsCard');
+            if (totalProjectsCard) {
+                totalProjectsCard.addEventListener('click', function() {
+                    console.log('Total Projects card clicked');
+                    // Force load projects data when card is clicked
+                    loadProjectsData();
+                });
+            }
+            
+            // Projects modal event listeners
+            const projectsModal = document.getElementById('projectsModal');
+            if (projectsModal) {
+                projectsModal.addEventListener('shown.bs.modal', function() {
+                    console.log('Projects modal shown');
+                    if (allProjectsData.length === 0) {
+                        console.log('Loading projects data...');
+                        loadProjectsData();
+                    }
+                });
+                
+                projectsModal.addEventListener('show.bs.modal', function() {
+                    console.log('Projects modal showing');
+                    // Also try loading when modal starts to show
+                    if (allProjectsData.length === 0) {
+                        loadProjectsData();
+                    }
+                });
+            }
+            
+            // Search and filter event listeners
+            const searchInput = document.getElementById('projectSearchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', filterProjects);
+            }
+            
+            const statusFilter = document.getElementById('projectStatusFilter');
+            if (statusFilter) {
+                statusFilter.addEventListener('change', filterProjects);
+            }
+            
+            // Refresh projects button
+            const refreshProjectsBtn = document.getElementById('refreshProjectsBtn');
+            if (refreshProjectsBtn) {
+                refreshProjectsBtn.addEventListener('click', loadProjectsData);
+            }
+            
+            // Total Users card click handler
+            const totalUsersCard = document.getElementById('totalUsersCard');
+            if (totalUsersCard) {
+                totalUsersCard.addEventListener('click', function() {
+                    console.log('Total Users card clicked');
+                    // Force load users data when card is clicked
+                    loadUsersData();
+                });
+            }
+            
+            // Users modal event listeners
+            const usersModal = document.getElementById('usersModal');
+            if (usersModal) {
+                usersModal.addEventListener('shown.bs.modal', function() {
+                    console.log('Users modal shown');
+                    if (allUsersData.length === 0) {
+                        console.log('Loading users data...');
+                        loadUsersData();
+                    }
+                });
+                
+                usersModal.addEventListener('show.bs.modal', function() {
+                    console.log('Users modal showing');
+                    // Also try loading when modal starts to show
+                    if (allUsersData.length === 0) {
+                        loadUsersData();
+                    }
+                });
+            }
+            
+            // Users search and filter event listeners
+            const userSearchInput = document.getElementById('userSearchInput');
+            if (userSearchInput) {
+                userSearchInput.addEventListener('input', filterUsers);
+            }
+            
+            const userStatusFilter = document.getElementById('userStatusFilter');
+            if (userStatusFilter) {
+                userStatusFilter.addEventListener('change', filterUsers);
+            }
+            
+            // Refresh users button
+            const refreshUsersBtn = document.getElementById('refreshUsersBtn');
+            if (refreshUsersBtn) {
+                refreshUsersBtn.addEventListener('click', loadUsersData);
+            }
+            
+            // AI Insights button
+            const aiInsightsBtn = document.getElementById('generateAIInsightsBtn');
+            console.log('AI Insights button found in DOMContentLoaded:', aiInsightsBtn);
+            
+            if (aiInsightsBtn) {
+                aiInsightsBtn.addEventListener('click', async function() {
+                    console.log('AI Insights button clicked!');
+                
+                    // Open the modal first
+                    const modal = new bootstrap.Modal(document.getElementById('aiInsightsModal'));
+                    console.log('Modal created, showing modal...');
+                    modal.show();
+                    
+                    if (!currentSprintReportData || !currentSprintReportData.report) {
+                        // Show helpful message if no sprint data
+                        const resultsEl = document.getElementById('aiInsightsResults');
+                        const loadingEl = document.getElementById('aiInsightsLoading');
+                        const errorEl = document.getElementById('aiInsightsError');
+                        
+                        loadingEl.style.display = 'none';
+                        resultsEl.style.display = 'none';
+                        errorEl.style.display = '';
+                        errorEl.innerHTML = `
+                            <div class="text-center py-4">
+                                <i class="fas fa-info-circle fa-3x text-info mb-3"></i>
+                                <h5>No Sprint Data Available</h5>
+                                <p class="text-muted mb-3">To generate AI insights, you need to:</p>
+                                <ol class="text-start d-inline-block">
+                                    <li>Enter a Jira board URL or Board ID</li>
+                                    <li>Click "Generate Report" to load sprint data</li>
+                                    <li>Then return here to get AI-powered insights</li>
+                                </ol>
+                                <div class="mt-3">
+                                    <button class="btn btn-primary" onclick="bootstrap.Modal.getInstance(document.getElementById('aiInsightsModal')).hide()">
+                                        <i class="fas fa-arrow-left me-2"></i>Go Generate Sprint Report
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    // Start AI analysis
+                    await generateAIInsights(currentSprintReportData.report);
+                });
+            } else {
+                console.error('AI Insights button not found in DOM!');
+            }
+        });
+
+        // Users data variables
+        let allUsersData = [];
+        let filteredUsersData = [];
+
+        // Load detailed users data
+        async function loadUsersData() {
+            console.log('loadUsersData called');
+            const loadingEl = document.getElementById('usersLoading');
+            const errorEl = document.getElementById('usersError');
+            const tableBody = document.getElementById('usersTableBody');
+            
+            console.log('Setting loading state');
+            loadingEl.style.display = 'block';
+            errorEl.style.display = 'none';
+            
+            try {
+                console.log('Making API request to /api/users_detailed');
+                const response = await fetch('/api/users_detailed');
+                console.log('API response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('API response data:', data);
+                allUsersData = data.users || [];
+                filteredUsersData = [...allUsersData];
+                
+                console.log(`Loaded ${allUsersData.length} users`);
+                updateUsersTable();
+                updateUsersCount();
+                
+            } catch (error) {
+                console.error('Error loading users:', error);
+                errorEl.style.display = 'block';
+                errorEl.textContent = `Failed to load users: ${error.message}`;
+                
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-danger py-4">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Failed to load users
+                        </td>
+                    </tr>
+                `;
+            } finally {
+                console.log('Hiding loading state');
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        // Update users table
+        function updateUsersTable() {
+            const tableBody = document.getElementById('usersTableBody');
+            
+            if (filteredUsersData.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="fas fa-search me-2"></i>No users found
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tableBody.innerHTML = filteredUsersData.map(user => {
+                const statusBadge = getUserStatusBadge(user.status);
+                const daysBadge = getDaysBadge(user.daysSinceActivity);
+                
+                return `
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-sm bg-success text-white rounded-circle me-2 d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div>
+                                    <strong>${user.displayName}</strong>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="text-muted">${user.emailAddress}</span>
+                        </td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <span class="text-muted">${user.lastActivity || 'N/A'}</span>
+                        </td>
+                        <td>${daysBadge}</td>
+                        <td>
+                            <span class="badge bg-secondary">${user.licenseType}</span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="openUserInJira('${user.accountId}')" title="Open in Jira">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </button>
+                                <button class="btn btn-outline-info" onclick="viewUserDetails('${user.accountId}')" title="View Details">
+                                    <i class="fas fa-info-circle"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Helper function for user status badges
+        function getUserStatusBadge(status) {
+            const badgeClasses = {
+                'Active': 'bg-success',
+                'Inactive': 'bg-danger',
+                'Unknown': 'bg-secondary'
+            };
+            
+            return `<span class="badge ${badgeClasses[status] || 'bg-secondary'}">${status}</span>`;
+        }
+
+        // Update users count
+        function updateUsersCount() {
+            const countEl = document.getElementById('usersCount');
+            countEl.textContent = `${filteredUsersData.length} of ${allUsersData.length} users`;
+        }
+
+        // Filter users
+        function filterUsers() {
+            const searchTerm = document.getElementById('userSearchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('userStatusFilter').value;
+            
+            filteredUsersData = allUsersData.filter(user => {
+                const matchesSearch = user.displayName.toLowerCase().includes(searchTerm) || 
+                                    user.emailAddress.toLowerCase().includes(searchTerm);
+                
+                const matchesStatus = statusFilter === 'all' || 
+                                    (statusFilter === 'active' && user.status === 'Active') ||
+                                    (statusFilter === 'inactive' && user.status === 'Inactive');
+                
+                return matchesSearch && matchesStatus;
+            });
+            
+            updateUsersTable();
+            updateUsersCount();
+        }
+
+        // Helper functions for user actions
+        function openUserInJira(accountId) {
+            // This would need the Jira URL from settings
+            const jiraUrl = 'https://your-domain.atlassian.net'; // This should be dynamic
+            window.open(`${jiraUrl}/people/${accountId}`, '_blank');
+        }
+
+        function viewUserDetails(accountId) {
+            const user = allUsersData.find(u => u.accountId === accountId);
+            if (user) {
+                alert(`User: ${user.displayName}\nEmail: ${user.emailAddress}\nStatus: ${user.status}\nLast Activity: ${user.lastActivity}\nLicense Type: ${user.licenseType}`);
+            }
+        }
+
+        // SprintCross Form Submission
+        const sprintCrossForm = document.getElementById('sprintCrossForm');
+        sprintCrossForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const boardInput = document.getElementById('sprintCrossBoardInput').value.trim();
+            if (!boardInput) {
+                showSprintCrossError('Please enter a Jira board URL or Board ID.');
+                return;
+            }
+            const boardId = extractBoardIdFromUrl(boardInput);
+            if (!boardId) {
+                showSprintCrossError('Could not extract board ID from the provided input.');
+                return;
+            }
+            loadSprintCrossDataByBoard(boardId);
+        });
+
+        // Helper to extract board ID from URL or input
+        function extractBoardIdFromUrl(input) {
+            if (/^\d+$/.test(input.trim())) {
+                return input.trim();
+            }
+            const patterns = [
+                /\/boards\/(\d+)/,
+                /rapidView=(\d+)/,
+                /board=(\d+)/,
+                /boardId=(\d+)/
+            ];
+            for (const pattern of patterns) {
+                const match = input.match(pattern);
+                if (match) {
+                    return match[1];
+                }
+            }
+            return null;
+        }
+
+        // Fetch and display SprintCross data by board
+        async function loadSprintCrossDataByBoard(boardId) {
+            try {
+                // Show progress bar and initialize
+                const progressBar = document.getElementById('sprintCrossProgressBar');
+                const progressBarFill = document.getElementById('sprintCrossProgressBarFill');
+                const progressText = document.getElementById('sprintCrossProgressText');
+                
+                progressBar.style.display = 'block';
+                progressBarFill.style.width = '0%';
+                progressText.textContent = 'Initializing request...';
+                
+                // Simulate progress updates
+                const progressSteps = [
+                    { progress: 20, text: 'Connecting to JIRA...' },
+                    { progress: 40, text: 'Fetching board data...' },
+                    { progress: 60, text: 'Analyzing sprint data...' },
+                    { progress: 80, text: 'Processing issues...' },
+                    { progress: 90, text: 'Generating charts...' }
+                ];
+                
+                let currentStep = 0;
+                const progressInterval = setInterval(() => {
+                    if (currentStep < progressSteps.length) {
+                        const step = progressSteps[currentStep];
+                        progressBarFill.style.width = step.progress + '%';
+                        progressText.textContent = step.text;
+                        currentStep++;
+                    }
+                }, 300);
+                
+                const resp = await fetch(`/api/issues/multi_sprint?board_id=${boardId}`);
+                clearInterval(progressInterval);
+                
+                if (!resp.ok) throw new Error('Failed to load SprintCross data');
+                
+                // Complete progress
+                progressBarFill.style.width = '100%';
+                progressText.textContent = 'Analysis complete!';
+                
+                const data = await resp.json();
+                displaySprintCrossData(data);
+            } catch (e) {
+                showSprintCrossError('Failed to load SprintCross data.');
+            } finally {
+                setTimeout(() => {
+                    document.getElementById('sprintCrossProgressBar').style.display = 'none';
+                }, 1000);
+            }
+        }
+
+        // Display SprintCross data
+        function displaySprintCrossData(data) {
+            console.log('displaySprintCrossData called with:', data);
+            const summary = document.getElementById('sprintCrossSummary');
+            const breakdowns = document.getElementById('sprintCrossBreakdowns');
+            const jiraBtn = document.getElementById('sprintCrossJiraBtn');
+            
+            console.log('Found elements:', { summary: !!summary, breakdowns: !!breakdowns, jiraBtn: !!jiraBtn });
+            
+            // Clear previous content
+            summary.innerHTML = '';
+            breakdowns.style.display = 'none';
+            jiraBtn.style.display = 'none';
+            
+            if (!data || !data.issues || !Array.isArray(data.issues)) {
+                console.error('Invalid data structure:', data);
+                showSprintCrossError('Invalid data received from server.');
+                return;
+            }
+            
+            const issues = data.issues;
+            const totalIssues = issues.length;
+            
+            if (totalIssues === 0) {
+                summary.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>No issues found in multiple sprints for this board.</div>';
+                return;
+            }
+            
+            // Display summary
+            summary.innerHTML = `
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-chart-line me-2"></i>SprintCross Analysis Complete</h6>
+                    <p class="mb-0">Found <strong>${totalIssues}</strong> issues that have been in multiple sprints.</p>
+                </div>
+            `;
+            
+            // Show JIRA link if available
+            if (data.jira_link) {
+                jiraBtn.style.display = 'inline-block';
+                jiraBtn.onclick = () => window.open(data.jira_link, '_blank');
+            }
+            
+            // Display breakdowns
+            displaySprintCrossBreakdowns(data);
+            breakdowns.style.display = 'block';
+        }
+        
+        // Display SprintCross breakdowns
+        function displaySprintCrossBreakdowns(data) {
+            const issues = data.issues;
+            // --- Issue Types ---
+            const typeCounts = {};
+            issues.forEach(issue => {
+                const type = issue.issuetype || 'Unknown';
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+            renderSprintCrossPieChart('sprintCrossTypeChart', typeCounts, 'Issue Types');
+            // --- Priority Levels ---
+            const priorityCounts = {};
+            issues.forEach(issue => {
+                const priority = issue.priority || 'Unassigned';
+                priorityCounts[priority] = (priorityCounts[priority] || 0) + 1;
+            });
+            renderSprintCrossPieChart('sprintCrossPriorityChart', priorityCounts, 'Priority Levels');
+            // --- Completion Status ---
+            const statusCounts = {};
+            issues.forEach(issue => {
+                const status = issue.status || 'Unknown';
+                statusCounts[status] = (statusCounts[status] || 0) + 1;
+            });
+            renderSprintCrossPieChart('sprintCrossStatusChart', statusCounts, 'Completion Status');
+        }
+
+        // Chart.js pie/doughnut chart rendering
+        let sprintCrossCharts = {};
+        function renderSprintCrossPieChart(canvasId, countsObj, label) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            // Destroy previous chart if exists
+            if (sprintCrossCharts[canvasId]) {
+                sprintCrossCharts[canvasId].destroy();
+            }
+            const labels = Object.keys(countsObj);
+            const data = Object.values(countsObj);
+            const total = data.reduce((a, b) => a + b, 0);
+            
+            // Pick a color palette
+            const palette = [
+                '#36A2EB', '#FF6384', '#4BC0C0', '#FFCE56', '#9966FF', '#FF9F40', '#8BC34A', '#E91E63', '#00BCD4', '#FFC107', '#607D8B', '#795548'
+            ];
+            const backgroundColors = labels.map((_, i) => palette[i % palette.length]);
+            
+            sprintCrossCharts[canvasId] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 16,
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed;
+                                    const percent = ((value / total) * 100).toFixed(1);
+                                    return `${context.label}: ${value} (${percent}%)`;
+                                }
+                            }
+                        },
+                        title: {
+                            display: false
+                        }
+                    },
+                    cutout: '65%',
+                    maintainAspectRatio: false,
+                    animation: {
+                        animateRotate: true,
+                        animateScale: true
+                    }
+                },
+                
+            });
+        }
+
+        // Show SprintCross Error
+        function showSprintCrossError(message) {
+    document.getElementById('sprintCrossProgressBar').style.display = 'none';
+    const summary = document.getElementById('sprintCrossSummary');
+    summary.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error: ${message}</div>`;
+}
     </script>
-</body>
-</html> 
+
+    <!-- Projects Modal -->
+    <div class="modal fade" id="projectsModal" tabindex="-1" aria-labelledby="projectsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="projectsModalLabel">
+                        <i class="fas fa-project-diagram me-2"></i>All Projects
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="projectSearchInput" placeholder="Search projects...">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <select class="form-select" id="projectStatusFilter">
+                                <option value="all">All Projects</option>
+                                <option value="active">Active Projects</option>
+                                <option value="inactive">Inactive Projects</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="projectsLoading" class="text-center py-4" style="display: none;">
+                        <div class="spinner-border text-primary me-2" role="status"></div>
+                        <span>Loading projects...</span>
+                    </div>
+                    
+                    <div id="projectsError" class="alert alert-danger" style="display: none;"></div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Project</th>
+                                    <th>Key</th>
+                                    <th>Type</th>
+                                    <th>Last Activity</th>
+                                    <th>Days Since Activity</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="projectsTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>Click "Total Projects" to load data
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="me-auto">
+                        <small class="text-muted" id="projectsCount">0 projects</small>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="refreshProjectsBtn">
+                        <i class="fas fa-sync-alt me-2"></i>Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Modal -->
+    <div class="modal fade" id="usersModal" tabindex="-1" aria-labelledby="usersModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="usersModalLabel">
+                        <i class="fas fa-users me-2"></i>All Users
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="userSearchInput" placeholder="Search users...">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <select class="form-select" id="userStatusFilter">
+                                <option value="all">All Users</option>
+                                <option value="active">Active Users (30 days)</option>
+                                <option value="inactive">Inactive Users (120+ days)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="usersLoading" class="text-center py-4" style="display: none;">
+                        <div class="spinner-border text-primary me-2" role="status"></div>
+                        <span>Loading users...</span>
+                    </div>
+                    
+                    <div id="usersError" class="alert alert-danger" style="display: none;"></div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>User</th>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Last Activity</th>
+                                    <th>Days Since Activity</th>
+                                    <th>License Type</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <
