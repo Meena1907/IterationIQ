@@ -2,6 +2,14 @@
 .git
 .gitignore
 
+# Node.js (for frontend development)
+frontend/node_modules
+frontend/npm-debug.log
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
 # Python
 __pycache__
 *.pyc
@@ -24,6 +32,13 @@ coverage.xml
 .pytest_cache
 .hypothesis
 
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
 # OS
 .DS_Store
 .DS_Store?
@@ -33,42 +48,20 @@ coverage.xml
 ehthumbs.db
 Thumbs.db
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Temporary files
-temp_screenshots/
-*.tmp
-*.temp
-
-# Environment files
-.env
-.env.local
-.env.*.local
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
 
 # Documentation
 README.md
 *.md
 
-# Build files
-Dockerfile
-.dockerignore
-docker-compose.yml
+# Temporary files
+temp_screenshots/*
+!temp_screenshots/.gitkeep
+data/*
+!data/.gitkeep
 
-# Testing
-tests/
-test_*.py
-*_test.py
-
-# Bazel (if not needed for runtime)
-.bazelrc
-BUILD.bazel
-MODULE.bazel
-
-# Other
-.cursorignore
-jira_settings.json 
+# Old templates (replaced by React)
+templates/ 

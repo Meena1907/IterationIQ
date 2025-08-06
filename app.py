@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template, Response
+from flask import Flask, jsonify, request, render_template, Response, send_from_directory
 from flask_cors import CORS
 from scripts.jira_sprint_report import generate_jira_sprint_report, analyze_sprint
 from scripts.user_capacity_analysis import analyze_user_capacity
@@ -65,7 +65,7 @@ def get_jira_credentials():
         logger.error(f"Error loading JIRA credentials: {str(e)}")
         return None
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
 # Global cache for labels
@@ -304,7 +304,11 @@ def get_project_info():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return send_from_directory('static', 'index.html')
+
+@app.route('/<path:path>')
+def serve_react(path):
+    return send_from_directory('static', path)
 
 @app.route('/debug-openai')
 def debug_openai():
