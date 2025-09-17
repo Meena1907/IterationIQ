@@ -14,7 +14,6 @@ import {
   People as PeopleIcon,
   Psychology as PsychologyIcon,
   BugReport as BugReportIcon,
-  Analytics as AnalyticsIcon,
 } from '@mui/icons-material';
 import analytics from '../utils/analytics';
 
@@ -54,15 +53,6 @@ const Dashboard = ({ onNavigate }) => {
       color: '#FF9800',
       tabIndex: 5,
       features: ['Dependency Tracking', 'Blocked Issues', 'Cross-Sprint Analysis', 'Impact Assessment'],
-      status: 'Active'
-    },
-    {
-      title: 'User Analytics',
-      description: 'Track user engagement, page views, and application usage patterns with detailed analytics dashboard.',
-      icon: <AnalyticsIcon sx={{ fontSize: 40 }} />,
-      color: '#9C27B0',
-      tabIndex: 6,
-      features: ['User Tracking', 'Page Analytics', 'Usage Statistics', 'Performance Metrics'],
       status: 'Active'
     }
   ];
