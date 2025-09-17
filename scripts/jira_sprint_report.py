@@ -245,8 +245,8 @@ def analyze_sprint(sprint, board_id=None):
                 
                 # Initial planned: issues present at sprint start
                 # According to specification: completedIssues.length + issuesNotCompletedInSprint.length
-                # Using incompletedIssues for originally planned issues that were not completed
-                initial_planned = completed_count + len(incomplete_issues)
+                # Use not_completed_count which handles both cases (incomplete_issues available or calculated)
+                initial_planned = completed_count + not_completed_count
                 
                 # Calculate story points by making separate API calls to get full issue details
                 initial_planned_sp = 0
