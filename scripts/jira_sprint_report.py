@@ -244,7 +244,9 @@ def analyze_sprint(sprint, board_id=None):
                 removed_during_sprint = len(punted_issues)
                 
                 # Initial planned: issues present at sprint start
-                initial_planned = (completed_count + not_completed_count + removed_during_sprint) - added_during_sprint
+                # This should be: completed + not_completed + removed (issues that were planned at start)
+                # We don't subtract added_during_sprint because those weren't part of initial plan
+                initial_planned = completed_count + not_completed_count + removed_during_sprint
                 
                 # Calculate story points by making separate API calls to get full issue details
                 initial_planned_sp = 0
