@@ -49,6 +49,7 @@ import {
   LinkedIn as LinkedInIcon,
   GetApp as GetAppIcon,
   Link as LinkIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import html2canvas from 'html2canvas';
@@ -73,6 +74,7 @@ const SprintReport = () => {
   const [aiInsightsDialogOpen, setAiInsightsDialogOpen] = useState(false);
   const [aiInsights, setAiInsights] = useState(null);
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   
@@ -636,6 +638,11 @@ const SprintReport = () => {
                       <Tooltip title="Share Report">
                         <IconButton color="primary" onClick={handleShareReport} disabled={!sprintData.length}>
                           <ShareIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="API Information & Calculations">
+                        <IconButton color="primary" onClick={() => setInfoDialogOpen(true)}>
+                          <InfoIcon />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="AI Insights">
@@ -1270,6 +1277,237 @@ const SprintReport = () => {
             disabled={aiInsightsLoading}
           >
             Regenerate Insights
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* API Information Dialog */}
+      <Dialog open={infoDialogOpen} onClose={() => setInfoDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ 
+          borderBottom: '1px solid #e0e0e0', 
+          pb: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <InfoIcon color="primary" />
+          Jira API Information & Calculations
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom color="primary">
+              🔗 Jira APIs Used
+            </Typography>
+            <Box sx={{ ml: 2 }}>
+              <Typography variant="body2" paragraph>
+                <strong>1. Sprint Report API:</strong> <code>/rest/agile/1.0/board/&#123;boardId&#125;/sprint/&#123;sprintId&#125;/sprintreport</code>
+              </Typography>
+              <Typography variant="body2" paragraph>
+                <strong>2. Sprint API:</strong> <code>/rest/agile/1.0/board/&#123;boardId&#125;/sprint</code>
+              </Typography>
+              <Typography variant="body2" paragraph>
+                <strong>3. Issue API:</strong> <code>/rest/api/2/search</code> (for detailed issue information)
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom color="primary">
+              📊 Data Calculations
+            </Typography>
+            <Box sx={{ ml: 2 }}>
+              <Typography variant="body2" paragraph>
+                <strong>Start Date & End Date:</strong> Retrieved directly from Sprint API response fields <code>startDate</code> and <code>endDate</code>
+                <br />
+                <em>Result: ISO 8601 formatted dates (e.g., "2025-08-21T00:00:00.000Z")</em>
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Initial Planned:</strong> Count of issues that were in the sprint at the beginning (before any changes)
+                <br />
+                <em>Calculation:</em> <code>sprintReport.completedIssuesInitialEstimateSum + sprintReport.issuesNotCompletedInitialEstimateSum</code>
+                <br />
+                <em>Result: Integer count of issues (e.g., 15, 0, -1)</em>
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Completed:</strong> Count of issues with status "Done" or "Closed" at sprint end
+                <br />
+                <em>Calculation:</em> <code>sprintReport.completedIssuesInitialEstimateSum</code>
+                <br />
+                <em>Result: Integer count (e.g., 22, 0, 12)</em>
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Not Completed:</strong> Count of issues that were planned but not completed
+                <br />
+                <em>Calculation:</em> <code>sprintReport.issuesNotCompletedInitialEstimateSum</code>
+                <br />
+                <em>Result: Integer count (e.g., 4, 0, 3)</em>
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Added During Sprint:</strong> Count of issues added to the sprint after it started
+                <br />
+                <em>Calculation:</em> <code>sprintReport.issueKeysAddedDuringSprint.length</code>
+                <br />
+                <em>Result: Integer count (e.g., 23, 1, 33)</em>
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Removed During Sprint:</strong> Count of issues removed from the sprint after it started
+                <br />
+                <em>Calculation:</em> <code>sprintReport.issueKeysRemovedDuringSprint.length</code>
+                <br />
+                <em>Result: Integer count (e.g., 1, 0, 13)</em>
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Initial Planned SP:</strong> Sum of story points for issues planned at sprint start
+                <br />
+                <em>Calculation:</em> <code>sprintReport.completedIssuesInitialEstimateSum + sprintReport.issuesNotCompletedInitialEstimateSum</code>
+                <br />
+                <em>Result: Decimal story points (e.g., 45.5, 0, -20)</em>
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Completed SP:</strong> Sum of story points for completed issues
+                <br />
+                <em>Calculation:</em> <code>sprintReport.completedIssuesEstimateSum</code>
+                <br />
+                <em>Result: Decimal story points (e.g., 38.0, 0, 12)</em>
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Completion %:</strong> Percentage of story points completed
+                <br />
+                <em>Calculation:</em> <code>Math.round((Completed SP / Initial Planned SP) × 100)</code>
+                <br />
+                <em>Result: Percentage (e.g., 84.6%, 100.0%, 57.1%)</em>
+                <br />
+                <em>Special Cases:</em> "N/A" when Initial Planned SP is 0 or negative
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom color="primary">
+              🧠 Insight Generation
+            </Typography>
+            <Box sx={{ ml: 2 }}>
+              <Typography variant="body2" paragraph>
+                <strong>Good Velocity (✔):</strong> 
+                <br />
+                <em>Criteria:</em> Completion % ≥ 80% AND scope stability &lt; 20%
+                <br />
+                <em>Calculation:</em> <code>completionPercent >= 80 &#38;&#38; scopeChangePercent &#60; 20</code>
+                <br />
+                <em>Result:</em> Green checkmark with "Good velocity" message
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Moderate Delivery Rate (!):</strong>
+                <br />
+                <em>Criteria:</em> Completion % between 50-79%
+                <br />
+                <em>Calculation:</em> <code>completionPercent >= 50 &#38;&#38; completionPercent &#60; 80</code>
+                <br />
+                <em>Result:</em> Orange exclamation with "Moderate delivery rate" message
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Low Delivery Rate (X):</strong>
+                <br />
+                <em>Criteria:</em> Completion % &lt; 50% OR no completed issues
+                <br />
+                <em>Calculation:</em> <code>completionPercent &#60; 50 || completedIssues === 0</code>
+                <br />
+                <em>Result:</em> Red X with "Low delivery rate" message
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Unstable Scope (!):</strong>
+                <br />
+                <em>Criteria:</em> High scope changes during sprint
+                <br />
+                <em>Calculation:</em> <code>scopeChangePercent = ((added + removed) / initialPlanned) × 100</code>
+                <br />
+                <em>Threshold:</em> &gt; 20% of initial planned issues
+                <br />
+                <em>Result:</em> Yellow exclamation with "Unstable scope" message
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Combined Insights:</strong>
+                <br />
+                <em>Multiple conditions can apply simultaneously:</em>
+                <br />
+                • "✔ Good velocity | ! Unstable scope" - Good completion but scope changes
+                <br />
+                • "! Moderate delivery rate | ! Unstable scope" - Moderate completion with scope issues
+                <br />
+                • "X Low delivery rate" - Poor performance
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom color="primary">
+              📈 Data Sources
+            </Typography>
+            <Box sx={{ ml: 2 }}>
+              <Typography variant="body2" paragraph>
+                • <strong>Sprint Report API:</strong> Provides comprehensive sprint metrics including completed, not completed, and scope changes
+              </Typography>
+              <Typography variant="body2" paragraph>
+                • <strong>Issue Details:</strong> Fetched for story point calculations and status verification
+              </Typography>
+              <Typography variant="body2" paragraph>
+                • <strong>Real-time Data:</strong> All calculations are based on current Jira data, not cached values
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h6" gutterBottom color="primary">
+              ⚠️ Data Validation & Edge Cases
+            </Typography>
+            <Box sx={{ ml: 2 }}>
+              <Typography variant="body2" paragraph>
+                <strong>Negative Values:</strong> Can occur when issues are removed from sprint after being completed
+                <br />
+                <em>Example:</em> Initial Planned: -1, Completed: 0 (issue was completed then removed)
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Zero Initial Planned:</strong> Sprint started with no planned issues
+                <br />
+                <em>Result:</em> Completion % shows "N/A" (division by zero protection)
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>High Scope Changes:</strong> More issues added/removed than initially planned
+                <br />
+                <em>Example:</em> Initial: 5, Added: 20, Removed: 3 (400% scope change)
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>Missing Story Points:</strong> Issues without story point estimates
+                <br />
+                <em>Handling:</em> Treated as 0 story points in calculations
+              </Typography>
+              
+              <Typography variant="body2" paragraph>
+                <strong>API Rate Limits:</strong> Jira API has rate limiting (100 requests/minute)
+                <br />
+                <em>Mitigation:</em> Requests are throttled and cached when possible
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, borderTop: '1px solid #e0e0e0' }}>
+          <Button onClick={() => setInfoDialogOpen(false)} variant="contained" color="primary">
+            Close
           </Button>
         </DialogActions>
       </Dialog>

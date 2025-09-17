@@ -1,8 +1,9 @@
-from flask import Flask, jsonify, request, render_template, Response, send_from_directory
+from flask import Flask, jsonify, request, render_template, Response, send_from_directory, session, g
 from flask_cors import CORS
 from scripts.jira_sprint_report import generate_jira_sprint_report, analyze_sprint
 from scripts.user_capacity_analysis import analyze_user_capacity
 from settings_manager import settings_manager
+from user_tracking import track_user_request, track_page_view, track_event, tracker
 import requests
 import os
 import base64
@@ -67,6 +68,15 @@ def get_jira_credentials():
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
+
+# Configure session for user tracking
+app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+
+# Add before_request handler for user tracking
+@app.before_request
+def before_request():
+    """Track user requests before processing"""
+    track_user_request()
 
 # Global cache for labels
 class LabelCache:
@@ -2984,6 +2994,91 @@ def api_issues_multi_sprint_by_team():
         })
     except Exception as e:
         logger.error(f"Error in multi-sprint issues by team API: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# User Analytics Endpoints
+@app.route('/api/analytics/stats', methods=['GET'])
+def get_analytics_stats():
+    """Get user analytics statistics"""
+    try:
+        days = request.args.get('days', 30, type=int)
+        stats = tracker.get_user_stats(days)
+        
+        # Track this analytics view
+        track_event('analytics_viewed', {'days': days})
+        
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Error getting analytics stats: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics/user/<user_id>', methods=['GET'])
+def get_user_details(user_id):
+    """Get detailed information about a specific user"""
+    try:
+        user_details = tracker.get_user_details(user_id)
+        if not user_details:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Track this user detail view
+        track_event('user_details_viewed', {'target_user_id': user_id})
+        
+        return jsonify(user_details)
+    except Exception as e:
+        logger.error(f"Error getting user details: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics/track', methods=['POST'])
+def track_custom_event():
+    """Track a custom event from the frontend"""
+    try:
+        data = request.get_json()
+        event_type = data.get('event_type')
+        event_data = data.get('event_data', {})
+        
+        if not event_type:
+            return jsonify({'error': 'event_type is required'}), 400
+        
+        track_event(event_type, event_data)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Error tracking custom event: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics/pageview', methods=['POST'])
+def track_page_view_endpoint():
+    """Track a page view from the frontend"""
+    try:
+        data = request.get_json()
+        page_path = data.get('page_path')
+        page_title = data.get('page_title', '')
+        referrer = data.get('referrer', '')
+        load_time_ms = data.get('load_time_ms', 0)
+        
+        if not page_path:
+            return jsonify({'error': 'page_path is required'}), 400
+        
+        track_page_view(page_path, page_title, referrer, load_time_ms)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Error tracking page view: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics/cleanup', methods=['POST'])
+def cleanup_analytics_data():
+    """Clean up old analytics data"""
+    try:
+        days_to_keep = request.json.get('days_to_keep', 90) if request.json else 90
+        tracker.cleanup_old_data(days_to_keep)
+        
+        # Track this cleanup action
+        track_event('analytics_cleanup', {'days_to_keep': days_to_keep})
+        
+        return jsonify({'success': True, 'message': f'Cleaned up data older than {days_to_keep} days'})
+    except Exception as e:
+        logger.error(f"Error cleaning up analytics data: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

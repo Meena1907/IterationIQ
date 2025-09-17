@@ -40,6 +40,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 COPY scripts/ ./scripts/
 COPY settings_manager.py .
+COPY ai_sprint_insights.py .
 COPY set_jira_creds.sh .
 
 # Copy built React app from frontend stage

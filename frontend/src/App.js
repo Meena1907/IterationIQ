@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   AppBar,
@@ -30,6 +30,7 @@ import {
   Psychology as PsychologyIcon,
   TrendingUp as TrendingUpIcon,
   BugReport as BugReportIcon,
+  Analytics as AnalyticsIcon,
 } from '@mui/icons-material';
 import Dashboard from './components/Dashboard';
 import SprintReport from './components/SprintReport';
@@ -37,12 +38,32 @@ import CapacityAnalysis from './components/CapacityAnalysis';
 import Settings from './components/Settings';
 import BestPractices from './components/BestPractices';
 import SprintCross from './components/SprintCross';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
+import analytics from './utils/analytics';
 
 function App() {
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+
+  // Initialize analytics tracking
+  useEffect(() => {
+    // Track app initialization
+    analytics.trackEvent('app_initialized', {
+      user_agent: navigator.userAgent,
+      screen_resolution: `${screen.width}x${screen.height}`,
+      viewport_size: `${window.innerWidth}x${window.innerHeight}`,
+      language: navigator.language,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
+
+    // Track page load performance
+    window.addEventListener('load', () => {
+      const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+      analytics.trackPerformance('page_load_time', loadTime);
+    });
+  }, []);
 
   // Create theme based on dark mode state
   const theme = createTheme({
@@ -76,6 +97,13 @@ function App() {
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
+    analytics.trackUserInteraction('theme_toggle', darkMode ? 'light' : 'dark');
+  };
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    const tabNames = ['dashboard', 'sprint_report', 'capacity_analysis', 'settings', 'best_practices', 'sprint_cross', 'analytics'];
+    analytics.trackNavigation(tabNames[activeTab] || 'unknown', tabNames[newTab] || 'unknown');
   };
 
   const renderTabContent = () => {
@@ -92,6 +120,8 @@ function App() {
         return <BestPractices />;
       case 5:
         return <SprintCross />;
+      case 6:
+        return <AnalyticsDashboard />;
       default:
         return <Dashboard onNavigate={setActiveTab} />;
     }
@@ -114,10 +144,25 @@ function App() {
             <Tooltip title="Dashboard">
               <IconButton 
                 color="inherit" 
-                onClick={() => setActiveTab(0)}
+                onClick={() => handleTabChange(0)}
                 sx={{ mr: 1, color: 'white' }}
+                data-analytics="button_click"
+                data-analytics-target="home_button"
               >
                 <HomeIcon sx={{ fontSize: 28 }} />
+              </IconButton>
+            </Tooltip>
+
+            {/* Analytics Button */}
+            <Tooltip title="User Analytics">
+              <IconButton 
+                color="inherit" 
+                onClick={() => handleTabChange(6)}
+                sx={{ mr: 1, color: 'white' }}
+                data-analytics="button_click"
+                data-analytics-target="analytics_button"
+              >
+                <AnalyticsIcon sx={{ fontSize: 28 }} />
               </IconButton>
             </Tooltip>
             
@@ -132,8 +177,13 @@ function App() {
             <Tooltip title="Settings">
               <IconButton 
                 color="inherit" 
-                onClick={() => setSettingsDialogOpen(true)}
+                onClick={() => {
+                  setSettingsDialogOpen(true);
+                  analytics.trackUserInteraction('button_click', 'settings_button');
+                }}
                 sx={{ color: 'white' }}
+                data-analytics="button_click"
+                data-analytics-target="settings_button"
               >
                 <SettingsIcon sx={{ fontSize: 28 }} />
               </IconButton>

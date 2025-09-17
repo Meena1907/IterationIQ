@@ -14,7 +14,9 @@ import {
   People as PeopleIcon,
   Psychology as PsychologyIcon,
   BugReport as BugReportIcon,
+  Analytics as AnalyticsIcon,
 } from '@mui/icons-material';
+import analytics from '../utils/analytics';
 
 const Dashboard = ({ onNavigate }) => {
   const dashboardItems = [
@@ -53,12 +55,23 @@ const Dashboard = ({ onNavigate }) => {
       tabIndex: 5,
       features: ['Dependency Tracking', 'Blocked Issues', 'Cross-Sprint Analysis', 'Impact Assessment'],
       status: 'Active'
+    },
+    {
+      title: 'User Analytics',
+      description: 'Track user engagement, page views, and application usage patterns with detailed analytics dashboard.',
+      icon: <AnalyticsIcon sx={{ fontSize: 40 }} />,
+      color: '#9C27B0',
+      tabIndex: 6,
+      features: ['User Tracking', 'Page Analytics', 'Usage Statistics', 'Performance Metrics'],
+      status: 'Active'
     }
   ];
 
-  const handleCardClick = (tabIndex) => {
+  const handleCardClick = (tabIndex, title) => {
     if (onNavigate) {
       onNavigate(tabIndex);
+      // Track dashboard navigation
+      analytics.trackUserInteraction('dashboard_card_click', title, { tab_index: tabIndex });
     }
   };
 
@@ -95,9 +108,11 @@ const Dashboard = ({ onNavigate }) => {
               }}
             >
               <CardActionArea 
-                onClick={() => handleCardClick(item.tabIndex)}
+                onClick={() => handleCardClick(item.tabIndex, item.title)}
                 sx={{ height: '100%', p: 0 }}
                 disabled={item.status === 'Coming Soon'}
+                data-analytics="dashboard_card_click"
+                data-analytics-target={item.title}
               >
                 <CardContent sx={{ p: 3 }}>
                   <Box display="flex" alignItems="flex-start" gap={2} mb={2}>

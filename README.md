@@ -15,6 +15,7 @@
 - [✨ Features Overview](#-features-overview)
 - [🏗️ Tech Stack](#️-tech-stack)
 - [🚀 Quick Start](#-quick-start)
+- [🐳 Docker Deployment](#-docker-deployment)
 - [📊 Sprint Report System](#-sprint-report-system)
 - [👤 Capacity Planning](#-capacity-planning)
 - [❓ Help & Best Practices](#-help--best-practices)
@@ -63,12 +64,17 @@
 - **Logging**: Structured logging with debug support
 
 ### 🎨 **Frontend**
-- **UI Framework**: Bootstrap 5.1+ (responsive components)
+- **UI Framework**: React 18+ with Material-UI (modern components)
 - **Charts**: Chart.js 3.0+ (interactive visualizations)
-- **Icons**: Font Awesome 6.0+ (comprehensive icon set)
-- **Styling**: Custom CSS with CSS Grid and Flexbox
-- **JavaScript**: Vanilla ES6+ (no heavy frameworks)
-- **Templates**: Jinja2 (server-side rendering)
+- **Icons**: Material-UI Icons (comprehensive icon set)
+- **Styling**: Material-UI theming with responsive design
+
+### 🐳 **Deployment**
+- **Containerization**: Docker with multi-stage builds
+- **Orchestration**: Docker Compose for development and production
+- **Frontend Build**: Node.js 18+ for React application
+- **Backend Runtime**: Python 3.9+ Alpine Linux
+- **Production Server**: Flask with static file serving
 
 ### 📊 **Data & Analytics**
 - **Data Sources**: Jira Sprint Report API, Issue API, User API
@@ -130,6 +136,146 @@ JIRA_API_TOKEN=your-api-token-here
 ### 🌐 Access the Application
 
 Open your browser and navigate to: `http://localhost:5000`
+
+---
+
+## 🐳 Docker Deployment
+
+### 📋 Prerequisites for Docker
+- Docker and Docker Compose installed
+- Git repository cloned locally
+
+### 🚀 Quick Docker Deployment
+
+Follow these steps to deploy the application using Docker:
+
+#### Step 1: Navigate to Project Directory
+```bash
+cd jira_tpm/
+```
+
+#### Step 2: Stop Current Containers (if running)
+```bash
+docker-compose down
+```
+
+#### Step 3: Update Code Files
+```bash
+# Pull latest changes from master
+git pull origin master
+
+# Stash any local changes if needed
+git stash push -m "Local changes before deployment"
+```
+
+#### Step 4: Rebuild and Deploy
+```bash
+# Build and start the updated application
+docker-compose up --build -d
+```
+
+#### Step 5: Verify Deployment
+```bash
+# Check if container is running
+docker-compose ps
+
+# View application logs
+docker-compose logs
+
+# Test the application
+curl http://localhost:8080/
+```
+
+### 🌐 Access the Docker Application
+
+- **Port**: 8080
+- **Local URL**: `http://localhost:8080`
+- **Network URL**: `http://10.82.144.108:8080` (if accessible from network)
+
+### 🔧 Docker Configuration
+
+The application uses a multi-stage Docker build:
+
+1. **Frontend Stage**: Builds the React application with Node.js 18
+2. **Backend Stage**: Sets up Python 3.9 environment with Flask
+3. **Production Ready**: Serves the built React app through Flask
+
+### 📁 Docker Files Structure
+
+- `Dockerfile` - Multi-stage build configuration
+- `docker-compose.yml` - Production deployment
+- `docker-compose.dev.yml` - Development environment
+- `.dockerignore` - Files to exclude from Docker context
+
+### 🛠️ Troubleshooting Docker Deployment
+
+#### Container Keeps Restarting
+```bash
+# Check container logs
+docker-compose logs
+
+# Common issues:
+# - Missing dependencies (check Dockerfile COPY commands)
+# - Port conflicts (ensure port 8080 is available)
+# - Environment variables not set
+# - Missing Python modules (ensure all .py files are copied to container)
+```
+
+#### Frontend Not Loading
+```bash
+# Verify React build was successful
+docker-compose logs | grep "build"
+
+# Check if static files are being served
+curl http://localhost:8080/static/js/main.*.js
+```
+
+#### Backend API Issues
+```bash
+# Test API endpoints
+curl http://localhost:8080/api/labels
+curl http://localhost:8080/api/jira/boards_for_track
+```
+
+### 🔄 Development vs Production
+
+#### Development Mode
+```bash
+# Run development environment with hot reload
+docker-compose -f docker-compose.dev.yml up --build
+```
+- Frontend: `http://localhost:3001`
+- Backend: `http://localhost:5000`
+
+#### Production Mode
+```bash
+# Run production environment
+docker-compose up --build -d
+```
+- Application: `http://localhost:8080`
+
+### ✅ Deployment Verification
+
+After successful deployment, you should see:
+
+1. **Container Status**: `docker-compose ps` shows `Up` status
+2. **Application Access**: React frontend loads at `http://localhost:8080`
+3. **API Endpoints**: Backend APIs respond correctly
+4. **Logs**: No error messages in `docker-compose logs`
+
+#### Quick Health Check
+```bash
+# Test main application
+curl http://localhost:8080/ | grep -o "<title>.*</title>"
+
+# Test API endpoints
+curl http://localhost:8080/api/labels
+curl http://localhost:8080/api/jira/boards_for_track
+```
+
+Expected output:
+- Main page: `<title>Spark - Sprint Analytics</title>`
+- API endpoints: JSON responses or appropriate error messages
 
 ---
 
