@@ -911,99 +911,79 @@ def get_sprint_report_progress():
 def process_sprint_report(task_id, sprint_id, board_id):
     try:
         sprint_report_tasks[task_id] = {'progress': 0, 'status': 'processing', 'result': None}
-        # Fetch sprint details
-        sprint_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}"
+        print(f"DEBUG: Starting sprint report processing for sprint {sprint_id}, board {board_id}")
+        
+        # Import the analyze_sprint function from our jira_sprint_report module
+        try:
+            from scripts.jira_sprint_report import analyze_sprint
+            print(f"DEBUG: Successfully imported analyze_sprint function")
+        except Exception as import_error:
+            print(f"DEBUG: Failed to import analyze_sprint: {import_error}")
+            sprint_report_tasks[task_id]['status'] = 'error'
+            sprint_report_tasks[task_id]['result'] = {'error': f'Import error: {import_error}'}
+            return
+        
+        # Get JIRA credentials
+        credentials = get_jira_credentials()
+        if not credentials:
+            print(f"DEBUG: No JIRA credentials available")
+            sprint_report_tasks[task_id]['status'] = 'error'
+            sprint_report_tasks[task_id]['result'] = {'error': 'No JIRA credentials configured'}
+            return
+        
+        # Fetch sprint details first
+        sprint_url = f"{credentials['url']}/rest/agile/1.0/sprint/{sprint_id}"
+        print(f"DEBUG: Fetching sprint details from {sprint_url}")
         sprint_resp = make_jira_request(sprint_url)
         if not sprint_resp or sprint_resp.status_code != 200:
+            print(f"DEBUG: Failed to fetch sprint details. Status: {sprint_resp.status_code if sprint_resp else 'None'}")
             sprint_report_tasks[task_id]['status'] = 'error'
             sprint_report_tasks[task_id]['result'] = {'error': 'Failed to fetch sprint details'}
             return
+        
         sprint = sprint_resp.json()
-        # Fetch issues in the sprint
-        issues_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=50"
-        issues_resp = make_jira_request(issues_url)
-        if not issues_resp or issues_resp.status_code != 200:
-            sprint_report_tasks[task_id]['status'] = 'error'
-            sprint_report_tasks[task_id]['result'] = {'error': 'Failed to fetch sprint issues'}
-            return
-        issues_data = issues_resp.json()
-        issues = issues_data.get('issues', [])
-        total_issues = len(issues)
-        completed_count = 0
-        not_completed_count = 0
-        added_in_middle = 0
-        removed_in_middle = 0
-        added_in_middle_keys = []
-        removed_in_middle_keys = []
-        sprint_start = sprint.get('startDate')
-        sprint_end = sprint.get('endDate')
-        if sprint_start:
-            sprint_start_dt = parser.parse(sprint_start)
-            sprint_end_dt = parser.parse(sprint_end) if sprint_end else None
+        print(f"DEBUG: Successfully fetched sprint: {sprint.get('name', 'Unknown')}")
+        sprint_report_tasks[task_id]['progress'] = 25
+        
+        # Use our analyze_sprint function which has the correct logic and debugging
+        print(f"DEBUG: Calling analyze_sprint function")
+        sprint_analysis = analyze_sprint(sprint, board_id)
+        print(f"DEBUG: analyze_sprint returned: {sprint_analysis}")
+        sprint_report_tasks[task_id]['progress'] = 75
+        
+        if sprint_analysis:
+            # Convert our analysis format to the expected format
+            summary = {
+                'sprint': {
+                    'id': sprint.get('id'),
+                    'name': sprint.get('name'),
+                    'state': sprint.get('state'),
+                    'startDate': sprint.get('startDate'),
+                    'endDate': sprint.get('endDate'),
+                    'goal': sprint.get('goal'),
+                },
+                'counts': {
+                    'completed': sprint_analysis.get('completed', 0),
+                    'not_completed': sprint_analysis.get('not_completed', 0),
+                    'added_in_middle': sprint_analysis.get('added_during_sprint', 0),
+                    'removed_in_middle': sprint_analysis.get('removed_during_sprint', 0),
+                    'initial_planned': sprint_analysis.get('initial_planned', 0)
+                },
+                'added_in_middle_keys': sprint_analysis.get('added_during_sprint_keys', []),
+                'removed_in_middle_keys': sprint_analysis.get('removed_during_sprint_keys', [])
+            }
+            print(f"DEBUG: Sprint analysis completed successfully")
+            sprint_report_tasks[task_id]['status'] = 'done'
+            sprint_report_tasks[task_id]['result'] = summary
         else:
-            sprint_start_dt = sprint_end_dt = None
-        for idx, issue in enumerate(issues):
-            status = issue['fields'].get('status', {}).get('name', '')
-            if status.lower() in ['done', 'closed', 'resolved']:
-                completed_count += 1
-            else:
-                not_completed_count += 1
-            # Analyze changelog for added/removed in middle
-            issue_key = issue['key']
-            issue_url = f"{JIRA_URL}/rest/api/2/issue/{issue_key}?expand=changelog"
-            issue_resp = make_jira_request(issue_url)
-            if not issue_resp or issue_resp.status_code != 200:
-                continue
-            changelog = issue_resp.json().get('changelog', {}).get('histories', [])
-            added = False
-            removed = False
-            for history in changelog:
-                created = history.get('created')
-                created_dt = None
-                if created:
-                    try:
-                        created_dt = parser.parse(created)
-                    except Exception:
-                        created_dt = None
-                for item in history.get('items', []):
-                    if item.get('field') == 'Sprint':
-                        to_sprints = item.get('toString', '')
-                        from_sprints = item.get('fromString', '')
-                        if to_sprints and sprint.get('name') in to_sprints:
-                            if sprint_start_dt and created_dt and created_dt > sprint_start_dt:
-                                added = True
-                        if from_sprints and sprint.get('name') in from_sprints:
-                            if sprint_end_dt and created_dt and created_dt < sprint_end_dt:
-                                removed = True
-            if added:
-                added_in_middle += 1
-                added_in_middle_keys.append(issue_key)
-            if removed:
-                removed_in_middle += 1
-                removed_in_middle_keys.append(issue_key)
-            # Update progress
-            sprint_report_tasks[task_id]['progress'] = int(((idx + 1) / total_issues) * 100)
-        summary = {
-            'sprint': {
-                'id': sprint.get('id'),
-                'name': sprint.get('name'),
-                'state': sprint.get('state'),
-                'startDate': sprint.get('startDate'),
-                'endDate': sprint.get('endDate'),
-                'goal': sprint.get('goal'),
-            },
-            'counts': {
-                'completed': completed_count,
-                'not_completed': not_completed_count,
-                'added_in_middle': added_in_middle,
-                'removed_in_middle': removed_in_middle
-            },
-            'added_in_middle_keys': added_in_middle_keys,
-            'removed_in_middle_keys': removed_in_middle_keys
-        }
-        sprint_report_tasks[task_id]['status'] = 'done'
-        sprint_report_tasks[task_id]['result'] = summary
+            print(f"DEBUG: analyze_sprint returned None")
+            sprint_report_tasks[task_id]['status'] = 'error'
+            sprint_report_tasks[task_id]['result'] = {'error': 'Failed to analyze sprint'}
+            
     except Exception as e:
+        print(f"DEBUG: Exception in process_sprint_report: {str(e)}")
+        import traceback
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
         sprint_report_tasks[task_id]['status'] = 'error'
         sprint_report_tasks[task_id]['result'] = {'error': str(e)}
 

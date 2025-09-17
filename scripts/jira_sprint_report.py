@@ -197,6 +197,14 @@ def analyze_sprint(sprint, board_id=None):
         print(f"Start: {start_date}")
         print(f"End: {end_date}")
         
+        # Special debugging for sprint 8699
+        if str(sprint_id) == "8699":
+            print(f"\n🔍 SPECIAL DEBUG FOR SPRINT 8699 🔍")
+            print(f"Sprint ID: {sprint_id}")
+            print(f"Sprint Name: {sprint_name}")
+            print(f"Expected Initial Planned: 40 (from Jira burndown chart)")
+            print(f"Our current calculation will be shown below...")
+        
         # Get all issues in the sprint using the sprint report API (more accurate)
         try:
             jira_url, auth_obj, headers_obj = get_auth_and_headers()
@@ -223,30 +231,103 @@ def analyze_sprint(sprint, board_id=None):
                 print(f"  issuesNotCompletedInCurrentSprint: {len(issues_not_completed_in_current_sprint)} items")
                 print(f"  issueKeysAddedDuringSprint: {len(issue_keys_added_during_sprint)} items")
                 
-                # Correct calculations
-                completed_count = len(completed_issues)
-                # For closed sprints, calculate not completed as: issues planned at start - completed - removed + added
-                # This gives us the actual issues that were planned but not completed
-                if len(incomplete_issues) == 0:
-                    # If incompletedIssues is empty, calculate based on the formula
-                    # Not completed = issuesNotCompletedInCurrentSprint - issueKeysAddedDuringSprint
-                    # This gives us issues that were planned at start but not completed
-                    not_completed_count = len(issues_not_completed_in_current_sprint) - len(issue_keys_added_during_sprint)
-                    not_completed_count = max(0, not_completed_count)  # Ensure it's not negative
-                    print(f"DEBUG - Calculated not_completed_count: {not_completed_count} (issuesNotCompletedInCurrentSprint: {len(issues_not_completed_in_current_sprint)} - issueKeysAddedDuringSprint: {len(issue_keys_added_during_sprint)})")
+                # Check if sprint report API returned empty data - use fallback
+                total_sprint_report_items = len(completed_issues) + len(incomplete_issues) + len(issues_not_completed_in_current_sprint)
+                if total_sprint_report_items == 0:
+                    print(f"DEBUG - Sprint Report API returned empty data, trying fallback with regular sprint issues API")
+                    
+                    # Fallback: Use regular sprint issues API
+                    issues_url = f"{jira_url}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=100"
+                    issues_resp = requests.get(issues_url, headers=headers_obj, auth=auth_obj)
+                    
+                    if issues_resp.status_code == 200:
+                        issues_data = issues_resp.json()
+                        all_issues = issues_data.get('issues', [])
+                        print(f"DEBUG - Fallback API found {len(all_issues)} issues in sprint")
+                        
+                        # Count completed vs not completed
+                        completed_issues = []
+                        incomplete_issues = []
+                        
+                        for issue in all_issues:
+                            status = issue.get('fields', {}).get('status', {}).get('name', '').lower()
+                            if status in ['done', 'closed', 'resolved', 'cancelled', 'duplicate']:
+                                completed_issues.append(issue)
+                            else:
+                                incomplete_issues.append(issue)
+                        
+                        print(f"DEBUG - Fallback calculation:")
+                        print(f"  Total issues: {len(all_issues)}")
+                        print(f"  Completed: {len(completed_issues)}")
+                        print(f"  Incomplete: {len(incomplete_issues)}")
+                        
+                        # For fallback, we'll assume all issues were initially planned
+                        # and none were added/removed during sprint (simplified approach)
+                        completed_count = len(completed_issues)
+                        not_completed_count = len(incomplete_issues)
+                        added_during_sprint = 0  # Can't determine from basic API
+                        removed_during_sprint = 0  # Can't determine from basic API
+                        
+                        print(f"DEBUG - Using fallback calculation for sprint report API failure")
+                    else:
+                        print(f"DEBUG - Fallback API also failed with status {issues_resp.status_code}")
+                        # Keep original empty values
+                        completed_count = 0
+                        not_completed_count = 0
+                        added_during_sprint = 0
+                        removed_during_sprint = 0
                 else:
-                    not_completed_count = len(incomplete_issues)
-                    print(f"DEBUG - Using incompletedIssues for not_completed_count: {not_completed_count}")
-                
-                print(f"DEBUG - issuesNotCompletedInCurrentSprint count: {len(issues_not_completed_in_current_sprint)} (includes added issues)")
-                
-                added_during_sprint = len(issue_keys_added_during_sprint)
-                removed_during_sprint = len(punted_issues)
+                    # Original logic when sprint report API has data
+                    completed_count = len(completed_issues)
+                    # For closed sprints, calculate not completed as: issues planned at start - completed - removed + added
+                    # This gives us the actual issues that were planned but not completed
+                    if len(incomplete_issues) == 0:
+                        # If incompletedIssues is empty, calculate based on the formula
+                        # Not completed = issuesNotCompletedInCurrentSprint - issueKeysAddedDuringSprint
+                        # This gives us issues that were planned at start but not completed
+                        not_completed_count = len(issues_not_completed_in_current_sprint) - len(issue_keys_added_during_sprint)
+                        not_completed_count = max(0, not_completed_count)  # Ensure it's not negative
+                        print(f"DEBUG - Calculated not_completed_count: {not_completed_count} (issuesNotCompletedInCurrentSprint: {len(issues_not_completed_in_current_sprint)} - issueKeysAddedDuringSprint: {len(issue_keys_added_during_sprint)})")
+                    else:
+                        not_completed_count = len(incomplete_issues)
+                        print(f"DEBUG - Using incompletedIssues for not_completed_count: {not_completed_count}")
+                    
+                    print(f"DEBUG - issuesNotCompletedInCurrentSprint count: {len(issues_not_completed_in_current_sprint)} (includes added issues)")
+                    
+                    added_during_sprint = len(issue_keys_added_during_sprint)
+                    removed_during_sprint = len(punted_issues)
                 
                 # Initial planned: issues present at sprint start
                 # According to specification: completedIssues.length + issuesNotCompletedInSprint.length
                 # Use not_completed_count which handles both cases (incomplete_issues available or calculated)
                 initial_planned = completed_count + not_completed_count
+                
+                # Special debugging for sprint 8699
+                if str(sprint_id) == "8699":
+                    print(f"\n🔍 SPRINT 8699 CALCULATION BREAKDOWN 🔍")
+                    print(f"completed_count: {completed_count}")
+                    print(f"not_completed_count: {not_completed_count}")
+                    print(f"initial_planned: {initial_planned}")
+                    print(f"Expected: 40, Got: {initial_planned}, Difference: {initial_planned - 40}")
+                    print(f"Raw API data:")
+                    print(f"  - completedIssues: {len(completed_issues)}")
+                    print(f"  - incompletedIssues: {len(incomplete_issues)}")
+                    print(f"  - issuesNotCompletedInCurrentSprint: {len(issues_not_completed_in_current_sprint)}")
+                    print(f"  - issueKeysAddedDuringSprint: {len(issue_keys_added_during_sprint)}")
+                    print(f"  - puntedIssues: {len(punted_issues)}")
+                    
+                    # Let's also check what Jira's burndown chart might be using
+                    # According to the screenshot, it shows 40 items total
+                    # Let's see if we can figure out what combination gives us 40
+                    alternative_calc1 = len(completed_issues) + len(incomplete_issues)
+                    alternative_calc2 = len(completed_issues) + len(issues_not_completed_in_current_sprint) - len(issue_keys_added_during_sprint)
+                    alternative_calc3 = len(completed_issues) + len(issues_not_completed_in_current_sprint)
+                    
+                    print(f"Alternative calculations:")
+                    print(f"  - completed + incomplete: {alternative_calc1}")
+                    print(f"  - completed + (notCompletedInCurrent - added): {alternative_calc2}")
+                    print(f"  - completed + notCompletedInCurrent: {alternative_calc3}")
+                    print(f"🔍 END SPRINT 8699 DEBUG 🔍\n")
                 
                 # Calculate story points by making separate API calls to get full issue details
                 initial_planned_sp = 0
