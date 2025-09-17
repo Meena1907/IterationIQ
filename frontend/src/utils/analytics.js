@@ -75,7 +75,7 @@ class Analytics {
         timestamp: new Date().toISOString(),
         session_id: this.sessionId,
         user_agent: navigator.userAgent,
-        screen_resolution: `${screen.width}x${screen.height}`,
+        screen_resolution: `${window.screen.width}x${window.screen.height}`,
         viewport_size: `${window.innerWidth}x${window.innerHeight}`,
         language: navigator.language,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone

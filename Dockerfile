@@ -41,6 +41,7 @@ COPY app.py .
 COPY scripts/ ./scripts/
 COPY settings_manager.py .
 COPY ai_sprint_insights.py .
+COPY user_tracking.py .
 COPY set_jira_creds.sh .
 
 # Copy built React app from frontend stage

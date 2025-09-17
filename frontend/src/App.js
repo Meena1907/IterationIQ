@@ -52,7 +52,7 @@ function App() {
     // Track app initialization
     analytics.trackEvent('app_initialized', {
       user_agent: navigator.userAgent,
-      screen_resolution: `${screen.width}x${screen.height}`,
+      screen_resolution: `${window.screen.width}x${window.screen.height}`,
       viewport_size: `${window.innerWidth}x${window.innerHeight}`,
       language: navigator.language,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
