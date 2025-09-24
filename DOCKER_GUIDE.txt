@@ -1,0 +1,468 @@
+================================================================================
+                    🐳 SPARK - DOCKER DEPLOYMENT GUIDE
+================================================================================
+
+📋 OVERVIEW
+-----------
+This guide contains complete instructions for containerizing and deploying your 
+Spark application using Docker. The application is a Flask-based web app that 
+provides Jira analytics, sprint reporting, and capacity planning features.
+
+🏗️ DOCKER SETUP FILES CREATED
+------------------------------
+1. Dockerfile - Production-ready container configuration
+2. docker-compose.yml - Easy deployment and development setup
+3. .dockerignore - Optimized build context (excludes unnecessary files)
+4. build-docker.sh - Automated build and deployment script
+5. Updated app.py - Docker-friendly host/port configuration
+
+================================================================================
+                              📋 PREREQUISITES
+================================================================================
+
+✅ REQUIREMENTS
+--------------
+- Docker installed (version 20.0+ recommended)
+- Docker Compose installed (usually comes with Docker Desktop)
+- Jira Cloud instance access
+- Valid Jira API token with appropriate permissions
+
+🔧 GET JIRA API TOKEN
+---------------------
+1. Go to: https://id.atlassian.com/manage-profile/security/api-tokens
+2. Click "Create API token"
+3. Give it a name (e.g., "Spark App")
+4. Copy the generated token (you won't see it again!)
+
+================================================================================
+                              🚀 QUICK START
+================================================================================
+
+📝 STEP 1: ENVIRONMENT SETUP
+----------------------------
+1. Create your environment file:
+   cp .env.example .env
+
+2. Edit .env file with your Jira credentials:
+   JIRA_URL=https://your-company.atlassian.net
+   JIRA_EMAIL=your-email@company.com
+   JIRA_API_TOKEN=your-api-token-here
+   
+   # Optional configurations:
+   FLASK_ENV=production
+   FLASK_DEBUG=False
+   PORT=8080
+   HOST=0.0.0.0
+
+🏗️ STEP 2: BUILD AND RUN
+------------------------
+Option A - Using the build script (Recommended):
+   ./build-docker.sh
+   docker-compose up -d
+
+Option B - Manual build and run:
+   docker build -t jira-hub:latest .
+   docker-compose up -d
+
+Option C - Direct Docker run:
+   docker build -t jira-hub:latest .
+   docker run -d --name jira-hub -p 8080:8080 --env-file .env jira-hub:latest
+
+🌐 STEP 3: ACCESS APPLICATION
+----------------------------
+Open your browser and go to: http://localhost:8080
+
+================================================================================
+                            🐳 DOCKER COMMANDS
+================================================================================
+
+🏗️ BUILD COMMANDS
+-----------------
+# Build the Docker image
+docker build -t jira-hub:latest .
+
+# Build with specific tag
+docker build -t jira-hub:v1.0 .
+
+# Build and show progress
+docker build -t jira-hub:latest . --progress=plain
+
+🚀 RUN COMMANDS
+--------------
+# Run with Docker Compose (Recommended)
+docker-compose up -d
+
+# Run in foreground (see logs)
+docker-compose up
+
+# Run single container
+docker run -d --name jira-hub -p 8080:8080 --env-file .env jira-hub:latest
+
+# Run with custom port
+docker run -d --name jira-hub -p 9000:8080 --env-file .env jira-hub:latest
+
+# Run with volume mounts
+docker run -d --name jira-hub -p 8080:8080 \
+  --env-file .env \
+  -v $(pwd)/temp_screenshots:/app/temp_screenshots \
+  -v $(pwd)/data:/app/data \
+  jira-hub:latest
+
+📊 MONITORING COMMANDS
+---------------------
+# View container status
+docker ps
+
+# View all containers (including stopped)
+docker ps -a
+
+# View container logs
+docker logs jira-hub
+
+# Follow logs in real-time
+docker logs -f jira-hub
+
+# View Docker Compose logs
+docker-compose logs
+
+# Follow Docker Compose logs
+docker-compose logs -f
+
+🛠️ MANAGEMENT COMMANDS
+----------------------
+# Stop containers
+docker-compose down
+docker stop jira-hub
+
+# Restart containers
+docker-compose restart
+docker restart jira-hub
+
+# Update and restart
+docker-compose down
+docker build -t jira-hub:latest .
+docker-compose up -d
+
+# Remove container
+docker rm jira-hub
+
+# Remove image
+docker rmi jira-hub:latest
+
+# Clean up unused Docker resources
+docker system prune -f
+
+================================================================================
+                            📁 FILE EXPLANATIONS
+================================================================================
+
+📄 DOCKERFILE
+-------------
+- Base Image: python:3.9-slim (lightweight Python environment)
+- Security: Creates non-root user 'app'
+- Health Check: HTTP check on port 8080 every 30 seconds
+- Dependencies: Installs system packages (gcc, curl) and Python requirements
+- Port: Exposes port 8080
+- Working Directory: /app
+- User: Runs as non-root user for security
+
+📄 DOCKER-COMPOSE.YML
+--------------------
+- Service: jira-hub (main application)
+- Port Mapping: 8080:8080 (host:container)
+- Environment: Loads from .env file
+- Volumes: Optional mounts for persistent data
+- Restart Policy: unless-stopped
+- Health Check: Built-in health monitoring
+- Redis: Optional service (commented out for future use)
+
+📄 .DOCKERIGNORE
+---------------
+Excludes unnecessary files from Docker build context:
+- Git files (.git, .gitignore)
+- Python cache files (__pycache__, *.pyc)
+- OS files (.DS_Store, Thumbs.db)
+- IDE files (.vscode, .idea)
+- Environment files (.env)
+- Documentation files (*.md)
+- Temporary files (temp_screenshots/)
+
+📄 BUILD-DOCKER.SH
+------------------
+Automated build script that:
+- Builds Docker image with proper tagging
+- Provides helpful commands and instructions
+- Shows next steps for deployment
+- Includes troubleshooting reminders
+
+================================================================================
+                            🔧 CONFIGURATION
+================================================================================
+
+🌍 ENVIRONMENT VARIABLES
+------------------------
+Required:
+- JIRA_URL: Your Jira instance URL (e.g., https://company.atlassian.net)
+- JIRA_EMAIL: Your Jira account email
+- JIRA_API_TOKEN: Your Jira API token
+
+Optional:
+- FLASK_ENV: production (default) or development
+- FLASK_DEBUG: False (default) or True
+- PORT: 8080 (default)
+- HOST: 0.0.0.0 (default for Docker)
+
+🔌 PORT CONFIGURATION
+--------------------
+Default: Application runs on port 8080
+
+Change port in docker-compose.yml:
+ports:
+  - "9000:8080"  # Access via http://localhost:9000
+
+Or set PORT environment variable:
+PORT=9000
+
+📂 VOLUME MOUNTS
+---------------
+Optional persistent storage:
+
+1. Screenshots:
+   ./temp_screenshots:/app/temp_screenshots
+
+2. Application data:
+   ./data:/app/data
+
+Add to docker-compose.yml volumes section or docker run command.
+
+================================================================================
+                            🩺 TROUBLESHOOTING
+================================================================================
+
+❌ COMMON ISSUES
+---------------
+
+1. PORT ALREADY IN USE
+   Error: "Port 8080 is already in use"
+   Solution:
+   - Change port in docker-compose.yml: "9000:8080"
+   - Or stop the conflicting service: lsof -ti:8080 | xargs kill
+
+2. ENVIRONMENT VARIABLES NOT LOADED
+   Error: "Missing environment variables"
+   Solution:
+   - Ensure .env file exists: ls -la .env
+   - Check .env format (no spaces around =)
+   - Verify docker-compose.yml has env_file: .env
+
+3. JIRA CONNECTION FAILED
+   Error: "Connection test failed"
+   Solution:
+   - Verify JIRA_URL (no trailing slash)
+   - Check JIRA_EMAIL is correct
+   - Regenerate JIRA_API_TOKEN if needed
+   - Test manually: curl -u email:token https://your-jira.com/rest/api/2/myself
+
+4. DOCKER BUILD FAILS
+   Error: Various build errors
+   Solution:
+   - Check Docker is running: docker version
+   - Clear Docker cache: docker system prune -f
+   - Rebuild without cache: docker build --no-cache -t jira-hub:latest .
+
+5. CONTAINER EXITS IMMEDIATELY
+   Error: Container stops right after starting
+   Solution:
+   - Check logs: docker logs jira-hub
+   - Verify .env file syntax
+   - Test locally first: python app.py
+
+🔍 DEBUGGING COMMANDS
+--------------------
+# Check container status
+docker ps -a
+
+# View detailed container info
+docker inspect jira-hub
+
+# Execute shell in running container
+docker exec -it jira-hub /bin/bash
+
+# Check container resource usage
+docker stats jira-hub
+
+# View build history
+docker history jira-hub:latest
+
+# Test application endpoint
+curl -f http://localhost:8080/
+
+================================================================================
+                          🌟 PRODUCTION DEPLOYMENT
+================================================================================
+
+🚀 DEPLOYMENT OPTIONS
+---------------------
+
+1. SINGLE SERVER DEPLOYMENT
+   - Use docker-compose.yml as provided
+   - Set up reverse proxy (nginx) if needed
+   - Configure SSL certificates
+   - Set up log rotation
+
+2. CLOUD DEPLOYMENT
+   - AWS ECS/Fargate
+   - Google Cloud Run
+   - Azure Container Instances
+   - DigitalOcean App Platform
+
+3. KUBERNETES DEPLOYMENT
+   - Create deployment and service YAML files
+   - Set up ingress controller
+   - Configure secrets for environment variables
+   - Set up horizontal pod autoscaling
+
+🔒 SECURITY CONSIDERATIONS
+-------------------------
+- Use secrets management for API tokens
+- Run container as non-root user (already configured)
+- Set up HTTPS with SSL certificates
+- Implement proper logging and monitoring
+- Regular security updates for base image
+- Network security (firewall rules)
+
+📊 MONITORING & LOGGING
+----------------------
+- Health checks are built-in
+- Use docker logs for application logs
+- Consider ELK stack for log aggregation
+- Set up monitoring (Prometheus + Grafana)
+- Configure alerts for container health
+
+================================================================================
+                          🌐 SHARING DOCKER IMAGES
+================================================================================
+
+🚀 SHARING METHODS
+------------------
+There are several ways to share your Docker image for hosting:
+
+1. DOCKER HUB (Recommended for public projects)
+   # Create account at hub.docker.com, then:
+   docker login
+   docker build -t yourusername/jira-hub:latest .
+   docker push yourusername/jira-hub:latest
+   
+   # Others can pull with:
+   docker pull yourusername/jira-hub:latest
+
+2. CLOUD CONTAINER REGISTRIES
+   - AWS ECR: aws ecr get-login-password | docker login --username AWS --password-stdin
+   - Google GCR: gcloud auth configure-docker
+   - Azure ACR: az acr login --name myregistry
+   - GitHub GHCR: echo $GITHUB_TOKEN | docker login ghcr.io -u username --password-stdin
+
+3. SAVE/LOAD AS FILES (No registry needed)
+   # Save to file
+   docker save jira-hub:latest | gzip > jira-hub.tar.gz
+   
+   # Load from file
+   gunzip -c jira-hub.tar.gz | docker load
+
+4. PRIVATE REGISTRY
+   # Run local registry
+   docker run -d -p 5000:5000 --name registry registry:2
+   docker tag jira-hub:latest localhost:5000/jira-hub:latest
+   docker push localhost:5000/jira-hub:latest
+
+🎯 QUICK SHARING COMMANDS
+------------------------
+# For Docker Hub (replace 'yourusername' with your Docker Hub username)
+docker build -t yourusername/jira-hub:latest .
+docker push yourusername/jira-hub:latest
+
+# Share this command with others:
+docker pull yourusername/jira-hub:latest
+docker run -d --name jira-hub -p 8080:8080 --env-file .env yourusername/jira-hub:latest
+
+# For file sharing (no registry needed)
+docker save jira-hub:latest | gzip > jira-hub.tar.gz
+# Share the .tar.gz file, others load with:
+gunzip -c jira-hub.tar.gz | docker load
+
+📋 DEPLOYMENT READY COMMANDS
+----------------------------
+After sharing via Docker Hub, others can deploy with:
+
+# Simple deployment
+docker run -d --name jira-hub -p 8080:8080 \
+  -e JIRA_URL=https://company.atlassian.net \
+  -e JIRA_EMAIL=email@company.com \
+  -e JIRA_API_TOKEN=your-token \
+  yourusername/jira-hub:latest
+
+# Or with docker-compose (recommended)
+# Create docker-compose.yml with your image name:
+version: '3.8'
+services:
+  jira-hub:
+    image: yourusername/jira-hub:latest
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
+
+See 'docker-image-sharing.md' for complete sharing guide with all methods.
+
+================================================================================
+                              📚 ADDITIONAL RESOURCES
+================================================================================
+
+🔗 USEFUL LINKS
+---------------
+- Docker Documentation: https://docs.docker.com/
+- Docker Compose Reference: https://docs.docker.com/compose/
+- Jira REST API: https://developer.atlassian.com/cloud/jira/platform/rest/v3/
+- Flask Docker Best Practices: https://flask.palletsprojects.com/en/2.0.x/deploying/
+- Docker Hub: https://hub.docker.com/
+- Docker Image Sharing Guide: See docker-image-sharing.md
+
+📋 NEXT STEPS
+-------------
+1. Test the application thoroughly
+2. Set up monitoring and logging
+3. Configure backup strategies
+4. Plan for scaling if needed
+5. Set up CI/CD pipeline for updates
+6. Document any custom configurations
+
+================================================================================
+                                📞 SUPPORT
+================================================================================
+
+For issues or questions:
+1. Check the troubleshooting section above
+2. Review Docker and Flask documentation
+3. Check application logs: docker logs jira-hub
+4. Verify Jira API connectivity
+
+Application will be available at: http://localhost:8080
+Docker Hub image size: ~150-200MB (Python 3.9-slim base)
+Container memory usage: ~50-100MB (typical Flask app)
+
+================================================================================
+                              🎉 SUCCESS!
+================================================================================
+
+Your Spark application is now fully containerized and ready for deployment!
+
+Key benefits of this Docker setup:
+✅ Production-ready configuration
+✅ Security best practices
+✅ Easy deployment and scaling
+✅ Consistent environment across systems
+✅ Built-in health monitoring
+✅ Optimized for performance
+
+Happy containerizing! 🐳🚀 

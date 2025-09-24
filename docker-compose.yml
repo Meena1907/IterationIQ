@@ -1,0 +1,13 @@
+spark:
+  build: .
+  ports:
+    - "8080:8080"
+  environment:
+    - FLASK_ENV=production
+    - PYTHONUNBUFFERED=1
+  env_file:
+    - .env
+  volumes:
+    - ./temp_screenshots:/app/temp_screenshots
+    - ./data:/app/data
+  restart: unless-stopped

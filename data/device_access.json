@@ -1,0 +1,21 @@
+{
+  "devices": {
+    "test_device_1": {
+      "first_access": "2025-09-16T15:40:06.837679",
+      "last_access": "2025-09-16T15:40:06.837702",
+      "access_count": 1
+    },
+    "2c6cf18b4286715a2b71cea71321d3c4": {
+      "first_access": "2025-09-16T15:48:36.863997",
+      "last_access": "2025-09-16T15:51:23.512957",
+      "access_count": 3
+    },
+    "ee58e70112bfaa4b1b6791606baa0704": {
+      "first_access": "2025-09-16T15:48:48.045852",
+      "last_access": "2025-09-16T15:52:49.421248",
+      "access_count": 18
+    }
+  },
+  "total_accesses": 22,
+  "last_updated": "2025-09-16T15:52:49.421622"
+}

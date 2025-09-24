@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared {% if report_data.get('type') == 'sprint_report' %}Sprint Analysis{% else %}Capacity Analysis{% endif %} Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f0fdfa 0%, #e6fffa 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .report-header {
+            background: #00ABE4;
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .metric-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00ABE4;
+        }
+        .share-info {
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            border-left: 4px solid #00ABE4;
+        }
+        .breakdown-item {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        .breakdown-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    {% if report_data.get('type') == 'sprint_report' %}
+                    <h1><i class="fas fa-running me-3"></i>Sprint Analysis Report</h1>
+                    <p class="mb-0">Shared Sprint Performance Analysis</p>
+                    {% else %}
+                    <h1><i class="fas fa-chart-line me-3"></i>Capacity Analysis Report</h1>
+                    <p class="mb-0">Shared Performance Analysis</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="badge bg-light text-dark fs-6">
+                        <i class="fas fa-share-alt me-2"></i>Shared Report
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Share Information -->
+        <div class="share-info">
+            <div class="row">
+                <div class="col-md-4">
+                    <small class="text-muted">Created:</small><br>
+                    <strong>{{ share_info.created_at[:10] }}</strong>
+                </div>
+                <div class="col-md-4">
+                    <small class="text-muted">Expires:</small><br>
+                    <strong>{{ share_info.expires_at[:10] }}</strong>
+                </div>
+                <div class="col-md-4">
+                    <small class="text-muted">Views:</small><br>
+                    <strong>{{ share_info.access_count }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screenshot Section (if available) -->
+        {% if report_data.get('screenshot_url') %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <h3><i class="fas fa-camera me-2"></i>Visual Report</h3>
+                    <div class="text-center">
+                        <img src="{{ report_data.screenshot_url }}" class="img-fluid border rounded" style="max-width: 100%; height: auto;" alt="Capacity Analysis Visual Report">
+                        <p class="mt-2 text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            This visual report includes all charts and metrics from the original analysis.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Sprint Report Content -->
+        {% if report_data.get('type') == 'sprint_report' %}
+        <!-- Board Information -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <h3><i class="fas fa-clipboard me-2"></i>Board Information</h3>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Board ID:</strong><br>
+                            {{ report_data.board_id }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Total Sprints:</strong><br>
+                            {{ report_data.report|length }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Analysis Date:</strong><br>
+                            {{ report_data.generated_at[:10] }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sprint Metrics -->
+        {% set avg_completion = (report_data.report | sum(attribute='Completion %') | replace('%', '') | float) / (report_data.report | length) %}
+        {% set total_completed = report_data.report | sum(attribute='Completed') %}
+        {% set total_not_completed = report_data.report | sum(attribute='Not Completed') %}
+        {% set total_scope_changes = report_data.report | sum(attribute='Added During Sprint') + report_data.report | sum(attribute='Removed During Sprint') %}
+        
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value">{{ "%.1f"|format(avg_completion) }}%</div>
+                    <div class="text-muted">Avg Completion</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value">{{ total_completed }}</div>
+                    <div class="text-muted">Total Completed</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value">{{ total_not_completed }}</div>
+                    <div class="text-muted">Not Completed</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value">{{ total_scope_changes }}</div>
+                    <div class="text-muted">Scope Changes</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sprint Details Table -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <h3><i class="fas fa-table me-2"></i>Sprint Details</h3>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Sprint Name</th>
+                                    <th>Period</th>
+                                    <th>Completion %</th>
+                                    <th>Completed</th>
+                                    <th>Not Completed</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sprint in report_data.report %}
+                                <tr>
+                                    <td>{{ sprint['Sprint Name'] }}</td>
+                                    <td>{{ sprint['Start Date'] }} to {{ sprint['End Date'] }}</td>
+                                    <td>
+                                        <span class="badge {% if sprint['Completion %']|replace('%', '')|float >= 80 %}bg-success{% elif sprint['Completion %']|replace('%', '')|float >= 60 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ sprint['Completion %'] }}
+                                        </span>
+                                    </td>
+                                    <td>{{ sprint['Completed'] }}</td>
+                                    <td>{{ sprint['Not Completed'] }}</td>
+                                    <td>{{ sprint['Status'] }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- User Information -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <h3><i class="fas fa-user me-2"></i>User Information</h3>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Email:</strong><br>
+                            {{ report_data.user_email }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Analysis Period:</strong><br>
+                            {{ report_data.analysis_period }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value">{{ "%.1f"|format(report_data.metrics.completion_rate * 100) }}%</div>
+                    <div class="text-muted">Completion Rate</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value">{{ "%.1f"|format(report_data.metrics.avg_completed_per_week) }}</div>
+                    <div class="text-muted">Avg Completed/Week</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value">{{ "%.1f"|format(report_data.metrics.avg_hours_per_week) }}h</div>
+                    <div class="text-muted">Avg Hours/Week</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value">{{ report_data.total_issues_analyzed }}</div>
+                    <div class="text-muted">Total Issues</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Issue Breakdown -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5><i class="fas fa-tasks me-2"></i>Issue Types</h5>
+                    {% for type, count in report_data.issue_breakdown.by_type.items() %}
+                    <div class="breakdown-item">
+                        <span>{{ type }}</span>
+                        <div>
+                            <span class="badge bg-primary">{{ count }}</span>
+                            <small class="text-muted ms-1">({{ "%.1f"|format((count / report_data.issue_breakdown.total_issues) * 100) }}%)</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5><i class="fas fa-flag me-2"></i>Priority Levels</h5>
+                    {% for priority, count in report_data.issue_breakdown.by_priority.items() %}
+                    <div class="breakdown-item">
+                        <span>{{ priority }}</span>
+                        <div>
+                            <span class="badge bg-info">{{ count }}</span>
+                            <small class="text-muted ms-1">({{ "%.1f"|format((count / report_data.issue_breakdown.total_issues) * 100) }}%)</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5><i class="fas fa-check-circle me-2"></i>Completion Status</h5>
+                    <div class="breakdown-item">
+                        <span><i class="fas fa-check-circle me-2 text-success"></i>Completed</span>
+                        <span class="badge bg-success">{{ report_data.issue_breakdown.by_completion.completed }}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span><i class="fas fa-play-circle me-2 text-warning"></i>In Progress</span>
+                        <span class="badge bg-warning text-dark">{{ report_data.issue_breakdown.by_completion.in_progress }}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span><i class="fas fa-pause-circle me-2 text-secondary"></i>Not Started</span>
+                        <span class="badge bg-secondary">{{ report_data.issue_breakdown.by_completion.not_started }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Insights and Recommendations -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <h5><i class="fas fa-lightbulb me-2 text-warning"></i>Key Insights</h5>
+                    <ul class="list-unstyled">
+                        {% for insight in report_data.insights %}
+                        <li class="mb-2">
+                            <i class="fas fa-arrow-right text-primary me-2"></i>
+                            {{ insight|replace('🎯', '')|replace('📊', '')|replace('⚡', '')|replace('🔍', '')|replace('💡', '') }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <h5><i class="fas fa-target me-2 text-success"></i>Recommendations</h5>
+                    <ul class="list-unstyled">
+                        {% for recommendation in report_data.recommendations %}
+                        <li class="mb-2">
+                            <i class="fas fa-arrow-right text-success me-2"></i>
+                            {{ recommendation|replace('🎯', '')|replace('📈', '')|replace('⚡', '')|replace('🔧', '')|replace('💪', '') }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weekly Performance Summary -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <h5><i class="fas fa-calendar-week me-2"></i>Weekly Performance Summary</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Week</th>
+                                    <th>Completed</th>
+                                    <th>Started</th>
+                                    <th>Hours Spent</th>
+                                    <th>Issues Worked</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for week in report_data.weekly_summary %}
+                                <tr>
+                                    <td>{{ week.week }}</td>
+                                    <td><span class="badge bg-success">{{ week.completed }}</span></td>
+                                    <td><span class="badge bg-primary">{{ week.started }}</span></td>
+                                    <td>{{ week.hours_spent }}h</td>
+                                    <td>{{ week.issues_worked }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="text-center py-4">
+            <div class="metric-card">
+                <p class="text-muted mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Generated by JIRA Capacity Planning Tool
+                </p>
+                <small class="text-muted">
+                    This is a shared report. The original analysis was performed using live JIRA data.
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

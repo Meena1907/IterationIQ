@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  spark:
+image: meenasingh3127/spark:latest
+container_name: spark
+    ports:
+      - "8080:8080"
+    environment:
+      # Replace these with your actual Jira credentials
+      - JIRA_URL=https://YOUR-COMPANY.atlassian.net
+      - JIRA_EMAIL=your-email@company.com
+      - JIRA_API_TOKEN=your-jira-api-token
+      - FLASK_ENV=production
+      - FLASK_DEBUG=False
+    volumes:
+      # Optional: persist screenshots and data
+      - ./temp_screenshots:/app/temp_screenshots
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Optional: Add more services like Redis for caching
+# services:
+#   redis:
+#     image: redis:7-alpine
+#     container_name: jira-hub-redis
+#     restart: unless-stopped 

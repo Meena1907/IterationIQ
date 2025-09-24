@@ -1,0 +1,22 @@
+# bazel run @rules_go//go install github.com/bazelbuild/buildtools/buildifier@latest
+genrule(
+    name = "buildifier_check",
+    srcs = glob([
+        "**/*.bzl",
+        "**/*.bazel",
+    ]),
+    outs = ["buildifier_check_result.txt"],
+    cmd = "buildifier --lint=warn $(SRCS) > $@",
+    message = "Running buildifier check",
+)
+
+genrule(
+    name = "buildifier_fix",
+    srcs = glob([
+        "**/*.bzl",
+        "**/*.bazel",
+    ]),
+    outs = ["buildifier_fix_result.txt"],
+    cmd = "buildifier --lint=fix $(SRCS) > $@",
+    message = "Running buildifier fix",
+)
