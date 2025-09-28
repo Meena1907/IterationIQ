@@ -43,7 +43,7 @@ class SettingsManager:
                 'include_comments': False,
                 'include_attachments': False
             },
-            'openai_api_key': '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',
+            'openai_api_key': 'your_openai_api_key_here',
             'azure_openai_endpoint': 'https://your-resource-name.openai.azure.com/',
             'azure_openai_api_version': '2023-05-15',
             'azure_openai_deployment_name': 'gpt-35-turbo',

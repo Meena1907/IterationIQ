@@ -21,7 +21,13 @@ import io
 import json
 import uuid
 
-from ai_sprint_insights import AISprintInsights
+# Optional AI import - only import if available
+try:
+    from ai_sprint_insights import AISprintInsights
+    AI_AVAILABLE = True
+except ImportError:
+    print("Warning: AI features not available (openai module not installed)")
+    AI_AVAILABLE = False
 
 # Configure logging to show all debug information
 logging.basicConfig(

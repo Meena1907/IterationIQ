@@ -1511,7 +1511,6 @@ const SprintReport = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Snackbar for notifications */}
       <Snackbar
         open={snackbarOpen}

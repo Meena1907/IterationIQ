@@ -205,31 +205,53 @@ def analyze_sprint(sprint, board_id=None):
             print(f"Expected Initial Planned: 40 (from Jira burndown chart)")
             print(f"Our current calculation will be shown below...")
         
-        # Get all issues in the sprint using the sprint report API (more accurate)
+        # Get all issues in the sprint using the official Jira Agile REST API
         try:
             jira_url, auth_obj, headers_obj = get_auth_and_headers()
-            # Try to get sprint report first (more accurate for closed sprints)
-            sprint_report_url = f"{jira_url}/rest/greenhopper/1.0/rapid/charts/sprintreport"
-            params = {"rapidViewId": board_id or "2008", "sprintId": sprint_id}
-            sprint_report_resp = requests.get(sprint_report_url, headers=headers_obj, auth=auth_obj, params=params)
             
-            if sprint_report_resp.status_code == 200:
-                sprint_report = sprint_report_resp.json()
+            # Step 1: Get sprint info (dates, state, etc.)
+            sprint_info_url = f"{jira_url}/rest/agile/1.0/sprint/{sprint_id}"
+            sprint_info_resp = requests.get(sprint_info_url, headers=headers_obj, auth=auth_obj)
+            
+            # Step 2: Get all issues in the sprint
+            sprint_issues_url = f"{jira_url}/rest/agile/1.0/sprint/{sprint_id}/issue"
+            params = {"maxResults": 1000}
+            sprint_issues_resp = requests.get(sprint_issues_url, headers=headers_obj, auth=auth_obj, params=params)
+            
+            if sprint_issues_resp.status_code == 200:
+                sprint_issues_data = sprint_issues_resp.json()
+                all_issues = sprint_issues_data.get("issues", [])
                 
-                # Get the correct fields from Jira Sprint Report API
-                completed_issues = sprint_report.get("contents", {}).get("completedIssues", [])
-                incomplete_issues = sprint_report.get("contents", {}).get("incompletedIssues", [])
-                punted_issues = sprint_report.get("contents", {}).get("puntedIssues", [])
-                issues_not_completed_in_current_sprint = sprint_report.get("contents", {}).get("issuesNotCompletedInCurrentSprint", [])
-                issue_keys_added_during_sprint = sprint_report.get("contents", {}).get("issueKeysAddedDuringSprint", [])
+                print(f"DEBUG - Found {len(all_issues)} issues in sprint {sprint_id}")
+                
+                # Analyze issues to determine completed vs not completed
+                completed_issues = []
+                incomplete_issues = []
+                issues_not_completed_in_current_sprint = []
+                issue_keys_added_during_sprint = []
+                
+                for issue in all_issues:
+                    issue_key = issue.get('key', '')
+                    status = issue.get('fields', {}).get('status', {}).get('name', '').lower()
+                    
+                    # Check if issue was completed
+                    if status in ['done', 'closed', 'resolved', 'cancelled', 'duplicate']:
+                        completed_issues.append(issue)
+                    else:
+                        incomplete_issues.append(issue)
+                        issues_not_completed_in_current_sprint.append(issue)
+                
+                # For now, we'll assume no issues were added during sprint
+                # This could be enhanced by checking issue creation dates vs sprint start date
+                punted_issues = []
                 
                 # Debug: Print what we actually got from the API
-                print(f"DEBUG - API Response fields:")
-                print(f"  completedIssues: {len(completed_issues)} items")
-                print(f"  incompletedIssues: {len(incomplete_issues)} items")
-                print(f"  puntedIssues: {len(punted_issues)} items")
-                print(f"  issuesNotCompletedInCurrentSprint: {len(issues_not_completed_in_current_sprint)} items")
-                print(f"  issueKeysAddedDuringSprint: {len(issue_keys_added_during_sprint)} items")
+                print(f"DEBUG - Sprint Issues Analysis:")
+                print(f"  Total issues: {len(all_issues)}")
+                print(f"  Completed issues: {len(completed_issues)}")
+                print(f"  Incomplete issues: {len(incomplete_issues)}")
+                print(f"  Issues not completed in current sprint: {len(issues_not_completed_in_current_sprint)}")
+                print(f"  Issues added during sprint: {len(issue_keys_added_during_sprint)}")
                 
                 # Check if sprint report API returned empty data - use fallback
                 total_sprint_report_items = len(completed_issues) + len(incomplete_issues) + len(issues_not_completed_in_current_sprint)
@@ -261,14 +283,109 @@ def analyze_sprint(sprint, board_id=None):
                         print(f"  Completed: {len(completed_issues)}")
                         print(f"  Incomplete: {len(incomplete_issues)}")
                         
-                        # For fallback, we'll assume all issues were initially planned
-                        # and none were added/removed during sprint (simplified approach)
-                        completed_count = len(completed_issues)
-                        not_completed_count = len(incomplete_issues)
-                        added_during_sprint = 0  # Can't determine from basic API
-                        removed_during_sprint = 0  # Can't determine from basic API
+                        # For fallback, we need to determine which issues were added during sprint
+                        # We can do this by checking the changelog for each issue
+                        print(f"DEBUG - Analyzing changelog to determine added/removed issues...")
                         
-                        print(f"DEBUG - Using fallback calculation for sprint report API failure")
+                        added_during_sprint = 0
+                        removed_during_sprint = 0
+                        added_issue_keys = []
+                        removed_issue_keys = []
+                        
+                        # Get sprint start date for comparison
+                        sprint_start_str = sprint.get('startDate')
+                        sprint_start_dt = None
+                        if sprint_start_str:
+                            try:
+                                sprint_start_dt = parser.parse(sprint_start_str)
+                                print(f"DEBUG - Sprint start date: {sprint_start_dt}")
+                            except Exception as e:
+                                print(f"DEBUG - Could not parse sprint start date: {e}")
+                        
+                        # Check each issue's changelog to see when it was added to sprint
+                        for issue in all_issues:
+                            issue_key = issue.get('key')
+                            if not issue_key:
+                                continue
+                                
+                            # Get issue changelog
+                            issue_url = f"{jira_url}/rest/api/2/issue/{issue_key}?expand=changelog"
+                            issue_resp = requests.get(issue_url, headers=headers_obj, auth=auth_obj)
+                            
+                            if issue_resp.status_code == 200:
+                                issue_data = issue_resp.json()
+                                changelog = issue_data.get('changelog', {}).get('histories', [])
+                                
+                                issue_added_during_sprint = False
+                                issue_removed_during_sprint = False
+                                
+                                for history in changelog:
+                                    created = history.get('created')
+                                    if not created or not sprint_start_dt:
+                                        continue
+                                        
+                                    try:
+                                        created_dt = parser.parse(created)
+                                    except Exception:
+                                        continue
+                                    
+                                    for item in history.get('items', []):
+                                        if item.get('field') == 'Sprint':
+                                            to_sprints = item.get('toString', '')
+                                            from_sprints = item.get('fromString', '')
+                                            
+                                            # Check if issue was added to this sprint after sprint start
+                                            if to_sprints and sprint.get('name') in to_sprints:
+                                                if created_dt > sprint_start_dt:
+                                                    issue_added_during_sprint = True
+                                            
+                                            # Check if issue was removed from this sprint
+                                            if from_sprints and sprint.get('name') in from_sprints:
+                                                issue_removed_during_sprint = True
+                                
+                                if issue_added_during_sprint:
+                                    added_during_sprint += 1
+                                    added_issue_keys.append(issue_key)
+                                elif issue_removed_during_sprint:
+                                    removed_during_sprint += 1
+                                    removed_issue_keys.append(issue_key)
+                        
+                        print(f"DEBUG - Changelog analysis results:")
+                        print(f"  Issues added during sprint: {added_during_sprint}")
+                        print(f"  Issues removed during sprint: {removed_during_sprint}")
+                        print(f"  Added issue keys: {added_issue_keys[:5]}{'...' if len(added_issue_keys) > 5 else ''}")
+                        print(f"  Removed issue keys: {removed_issue_keys[:5]}{'...' if len(removed_issue_keys) > 5 else ''}")
+                        
+                        # Calculate initial planned: total issues - added during sprint
+                        initial_planned = len(all_issues) - added_during_sprint
+                        
+                        # Recalculate completed and not completed based on initial planned issues
+                        # We need to exclude issues that were added during sprint from the counts
+                        initially_planned_issues = []
+                        for issue in all_issues:
+                            issue_key = issue.get('key')
+                            if issue_key not in added_issue_keys:
+                                initially_planned_issues.append(issue)
+                        
+                        # Count completed vs not completed for initially planned issues only
+                        completed_count = 0
+                        not_completed_count = 0
+                        
+                        for issue in initially_planned_issues:
+                            status = issue.get('fields', {}).get('status', {}).get('name', '').lower()
+                            if status in ['done', 'closed', 'resolved', 'cancelled', 'duplicate']:
+                                completed_count += 1
+                            else:
+                                not_completed_count += 1
+                        
+                        print(f"DEBUG - Initial planned calculation:")
+                        print(f"  Total issues in sprint: {len(all_issues)}")
+                        print(f"  Issues added during sprint: {added_during_sprint}")
+                        print(f"  Initial planned: {initial_planned}")
+                        print(f"  Initially planned completed: {completed_count}")
+                        print(f"  Initially planned not completed: {not_completed_count}")
+                        
+                        print(f"DEBUG - Using enhanced fallback calculation with changelog analysis")
                     else:
                         print(f"DEBUG - Fallback API also failed with status {issues_resp.status_code}")
                         # Keep original empty values
@@ -277,20 +394,17 @@ def analyze_sprint(sprint, board_id=None):
                         added_during_sprint = 0
                         removed_during_sprint = 0
                 else:
-                    # Original logic when sprint report API has data
+                    # Calculate completed and not completed counts from the sprint issues
                     completed_count = len(completed_issues)
-                    # For closed sprints, calculate not completed as: issues planned at start - completed - removed + added
-                    # This gives us the actual issues that were planned but not completed
-                    if len(incomplete_issues) == 0:
-                        # If incompletedIssues is empty, calculate based on the formula
-                        # Not completed = issuesNotCompletedInCurrentSprint - issueKeysAddedDuringSprint
-                        # This gives us issues that were planned at start but not completed
-                        not_completed_count = len(issues_not_completed_in_current_sprint) - len(issue_keys_added_during_sprint)
-                        not_completed_count = max(0, not_completed_count)  # Ensure it's not negative
-                        print(f"DEBUG - Calculated not_completed_count: {not_completed_count} (issuesNotCompletedInCurrentSprint: {len(issues_not_completed_in_current_sprint)} - issueKeysAddedDuringSprint: {len(issue_keys_added_during_sprint)})")
-                    else:
-                        not_completed_count = len(incomplete_issues)
-                        print(f"DEBUG - Using incompletedIssues for not_completed_count: {not_completed_count}")
+                    not_completed_count = len(incomplete_issues)
+                    
+                    print(f"DEBUG - Sprint Analysis Results:")
+                    print(f"  Completed: {completed_count}")
+                    print(f"  Not Completed: {not_completed_count}")
+                    print(f"  Total: {completed_count + not_completed_count}")
+                    
+                    # Calculate initial planned (all issues that were in the sprint)
+                    initial_planned = completed_count + not_completed_count
                     
                     print(f"DEBUG - issuesNotCompletedInCurrentSprint count: {len(issues_not_completed_in_current_sprint)} (includes added issues)")
                     
@@ -298,9 +412,11 @@ def analyze_sprint(sprint, board_id=None):
                     removed_during_sprint = len(punted_issues)
                 
                 # Initial planned: issues present at sprint start
-                # According to specification: completedIssues.length + issuesNotCompletedInSprint.length
-                # Use not_completed_count which handles both cases (incomplete_issues available or calculated)
-                initial_planned = completed_count + not_completed_count
+                # For fallback case, we already calculated initial_planned above
+                # For normal case, use the original logic
+                if 'initial_planned' not in locals():
+                    # Original logic when sprint report API has data
+                    initial_planned = completed_count + not_completed_count
                 
                 # Special debugging for sprint 8699
                 if str(sprint_id) == "8699":

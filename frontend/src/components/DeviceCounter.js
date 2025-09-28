@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from 'react';
 import { Box, Typography, Chip, Tooltip } from '@mui/material';
 import { Devices as DevicesIcon } from '@mui/icons-material';
 

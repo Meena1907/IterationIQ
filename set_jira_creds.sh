@@ -1,1 +1,3 @@
-export JIRA_URL="https://thoughtspot.atlassian.net" && export JIRA_EMAIL="meena.singh@thoughtspot.com" && export JIRA_API_TOKEN="ATATT3xFfGF08QRM95gO1wpvvnjoSiJB2_oWKL42XFeoHY3gqmPcY4owtqei4ixMZDEtWU69tjQLH-b4TVgaB7t3LY5TUX-9H14EQVY22GjsY0nPHmwTs9nrtZRvwrd_itTprvf-oW0rxvG8yhMIHOo88p41bQv8gOMzuhpDtmfAQ_6tcTqhxOc=475902D5"
+export JIRA_URL="https://thoughtspot.atlassian.net"
+export JIRA_EMAIL="your_email@thoughtspot.com"
+export JIRA_API_TOKEN="your_api_token_here"
