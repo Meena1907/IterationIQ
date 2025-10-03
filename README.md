@@ -92,6 +92,22 @@
 
 ---
 
+## 📁 Project Structure
+
+The project is organized into clear, logical folders:
+
+```
+jira_tpm/
+├── 📁 backend/          # Python Flask backend (app.py, scripts, etc.)
+├── 📁 frontend/         # React frontend application
+├── 📁 config/           # Configuration files and scripts
+├── 📁 docs/             # Documentation and guides
+├── 📁 data/             # Data storage and databases
+└── 🐳 Docker files      # Containerization setup
+```
+
+**See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for detailed folder organization.**
+
 ## 🚀 Quick Start
 
 ### 📋 Prerequisites

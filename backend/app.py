@@ -1,6 +1,6 @@
-from flask import Flask, jsonify, request, render_template, Response, send_from_directory, session, g
+from flask import Flask, jsonify, request, Response, session, g
 from flask_cors import CORS
-from scripts.jira_sprint_report import generate_jira_sprint_report, analyze_sprint
+from scripts.jira_sprint_report import generate_jira_sprint_report, analyze_sprint, generate_jira_sprint_report_progressive
 from scripts.user_capacity_analysis import analyze_user_capacity
 from settings_manager import settings_manager
 from user_tracking import track_user_request, track_page_view, track_event, tracker
@@ -38,7 +38,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Load environment variables as fallback
-load_dotenv()
+# Load from the project root .env file
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', '.env'))
 
 def get_jira_credentials():
     """Get JIRA credentials from settings manager with environment fallback"""
@@ -72,7 +73,7 @@ def get_jira_credentials():
         logger.error(f"Error loading JIRA credentials: {str(e)}")
         return None
 
-app = Flask(__name__, static_folder='static', static_url_path='')
+app = Flask(__name__)
 CORS(app)
 
 # Configure session for user tracking
@@ -126,6 +127,9 @@ sprint_trends_tasks = {}
 
 # In-memory storage for background capacity analysis tasks
 capacity_analysis_tasks = {}
+
+# In-memory storage for background sprint report tasks
+sprint_report_tasks = {}
 
 def make_jira_request(url, params=None, method='GET', json_data=None):
     """Make a request to Jira with rate limiting and retry logic"""
@@ -318,21 +322,10 @@ def get_project_info():
         logger.error(f"Unexpected error getting project info: {str(e)}")
         return None, []
 
-@app.route('/')
-def index():
-    return send_from_directory('static', 'index.html')
+# Frontend is served by React app in Docker container
+# These routes are no longer needed
 
-@app.route('/<path:path>')
-def serve_react(path):
-    return send_from_directory('static', path)
-
-@app.route('/debug-openai')
-def debug_openai():
-    return render_template('debug_openai_test.html')
-
-@app.route('/simple-test')
-def simple_test():
-    return render_template('simple_test.html')
+# Debug routes removed - using React frontend
 
 def fetch_all_labels():
     """Fetch all labels from Jira and update the cache"""
@@ -611,7 +604,8 @@ def add_label():
 @app.route('/api/labels/<old_label>', methods=['PUT'])
 def rename_label(old_label):
     try:
-        if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
+        credentials = get_jira_credentials()
+        if not credentials:
             return jsonify({'error': 'Missing Jira credentials. Please check your .env file.'}), 400
 
         data = request.json
@@ -621,7 +615,7 @@ def rename_label(old_label):
 
         # Get the SCAL project key
         projects_response = requests.get(
-            f'{JIRA_URL}/rest/api/2/project',
+            f"{credentials['url']}/rest/api/2/project",
             headers=get_jira_headers()
         )
         projects_response.raise_for_status()
@@ -638,7 +632,7 @@ def rename_label(old_label):
 
         # Search for issues with the old label in SCAL project
         response = requests.get(
-            f'{JIRA_URL}/rest/api/2/search',
+            f"{credentials['url']}/rest/api/2/search",
             headers=get_jira_headers(),
             params={
                 'jql': f'project = {scal_project["key"]} AND labels = "{old_label}"',
@@ -661,7 +655,7 @@ def rename_label(old_label):
                 current_labels.append(new_label)
                 
                 update_response = requests.put(
-                    f'{JIRA_URL}/rest/api/2/issue/{issue_key}',
+                    f"{credentials['url']}/rest/api/2/issue/{issue_key}",
                     headers=get_jira_headers(),
                     json={'fields': {'labels': current_labels}}
                 )
@@ -678,12 +672,13 @@ def rename_label(old_label):
 @app.route('/api/labels/<label>', methods=['DELETE'])
 def delete_label(label):
     try:
-        if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
+        credentials = get_jira_credentials()
+        if not credentials:
             return jsonify({'error': 'Missing Jira credentials. Please check your .env file.'}), 400
 
         # Get the SCAL project key
         projects_response = requests.get(
-            f'{JIRA_URL}/rest/api/2/project',
+            f"{credentials['url']}/rest/api/2/project",
             headers=get_jira_headers()
         )
         projects_response.raise_for_status()
@@ -700,7 +695,7 @@ def delete_label(label):
 
         # Search for issues with the label in SCAL project
         response = requests.get(
-            f'{JIRA_URL}/rest/api/2/search',
+            f"{credentials['url']}/rest/api/2/search",
             headers=get_jira_headers(),
             params={
                 'jql': f'project = {scal_project["key"]} AND labels = "{label}"',
@@ -722,7 +717,7 @@ def delete_label(label):
                 current_labels.remove(label)
                 
                 update_response = requests.put(
-                    f'{JIRA_URL}/rest/api/2/issue/{issue_key}',
+                    f"{credentials['url']}/rest/api/2/issue/{issue_key}",
                     headers=get_jira_headers(),
                     json={'fields': {'labels': current_labels}}
                 )
@@ -739,9 +734,10 @@ def delete_label(label):
 @app.route('/api/jira/tracks', methods=['GET'])
 def get_jira_tracks():
     try:
-        if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
+        credentials = get_jira_credentials()
+        if not credentials:
             return jsonify({'error': 'Missing Jira credentials'}), 500
-        response = make_jira_request(f'{JIRA_URL}/rest/api/2/project')
+        response = make_jira_request(f"{credentials['url']}/rest/api/2/project")
         if not response or response.status_code != 200:
             return jsonify({'error': 'Failed to fetch tracks from Jira'}), 500
         projects = response.json()
@@ -755,10 +751,11 @@ def get_jira_tracks():
 @app.route('/api/jira/tracks_customfield', methods=['GET'])
 def get_jira_tracks_customfield():
     try:
-        if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
+        credentials = get_jira_credentials()
+        if not credentials:
             return jsonify({'error': 'Missing Jira credentials'}), 500
         # Try Jira Cloud v3 API for custom field context
-        context_url = f"{JIRA_URL}/rest/api/3/field/customfield_15428/context"
+        context_url = f"{credentials['url']}/rest/api/3/field/customfield_15428/context"
         context_response = make_jira_request(context_url)
         logger.debug(f"Custom field context response status: {context_response.status_code if context_response else 'No response'}")
         logger.debug(f"Custom field context response text: {context_response.text if context_response else 'No response'}")
@@ -770,7 +767,7 @@ def get_jira_tracks_customfield():
             return jsonify({'error': 'No context found for custom field'}), 404
         context_id = contexts[0]['id']
         # Now get options for this context
-        options_url = f"{JIRA_URL}/rest/api/3/field/customfield_15428/context/{context_id}/option"
+        options_url = f"{credentials['url']}/rest/api/3/field/customfield_15428/context/{context_id}/option"
         options_response = make_jira_request(options_url)
         logger.debug(f"Custom field options response status: {options_response.status_code if options_response else 'No response'}")
         logger.debug(f"Custom field options response text: {options_response.text if options_response else 'No response'}")
@@ -788,7 +785,8 @@ def get_jira_tracks_customfield():
 @app.route('/api/jira/boards_for_track', methods=['GET'])
 def get_boards_for_track():
     try:
-        if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
+        credentials = get_jira_credentials()
+        if not credentials:
             return jsonify({'error': 'Missing Jira credentials'}), 500
         track = request.args.get('track', '').strip()
         logger.debug(f"Received track value for board search: '{track}'")
@@ -798,7 +796,7 @@ def get_boards_for_track():
         start_at = 0
         max_results = 50
         while True:
-            boards_url = f"{JIRA_URL}/rest/agile/1.0/board?type=scrum&startAt={start_at}&maxResults={max_results}"
+            boards_url = f"{credentials['url']}/rest/agile/1.0/board?type=scrum&startAt={start_at}&maxResults={max_results}"
             response = make_jira_request(boards_url)
             if not response or response.status_code != 200:
                 return jsonify({'error': 'Failed to fetch boards from Jira'}), 500
@@ -821,7 +819,8 @@ def get_boards_for_track():
 @app.route('/api/jira/sprints_for_board', methods=['GET'])
 def get_sprints_for_board():
     try:
-        if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
+        credentials = get_jira_credentials()
+        if not credentials:
             return jsonify({'error': 'Missing Jira credentials'}), 500
         board_id = request.args.get('board_id', '').strip()
         if not board_id:
@@ -833,7 +832,7 @@ def get_sprints_for_board():
         max_results = 50
         
         while True:
-            sprints_url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}"
+            sprints_url = f"{credentials['url']}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}"
             response = make_jira_request(sprints_url)
             if not response or response.status_code != 200:
                 return jsonify({'error': 'Failed to fetch sprints from Jira'}), 500
@@ -908,11 +907,23 @@ def get_sprint_report_progress():
     if not task_id or task_id not in sprint_report_tasks:
         return jsonify({'error': 'Invalid or missing task_id'}), 400
     task = sprint_report_tasks[task_id]
-    return jsonify({
+    
+    # Build response with available fields
+    response = {
         'progress': task.get('progress', 0),
         'status': task.get('status', 'pending'),
-        'result': task.get('result') if task.get('status') == 'done' else None
-    })
+        'result': task.get('result') if task.get('status') == 'completed' else None
+    }
+    
+    # Add new fields if they exist
+    if 'current_sprints' in task:
+        response['current_sprints'] = task.get('current_sprints', 0)
+    if 'total_sprints' in task:
+        response['total_sprints'] = task.get('total_sprints', 15)
+    if 'partial_results' in task and task.get('status') == 'in_progress':
+        response['partial_results'] = task.get('partial_results')
+    
+    return jsonify(response)
 
 def process_sprint_report(task_id, sprint_id, board_id):
     try:
@@ -996,7 +1007,8 @@ def process_sprint_report(task_id, sprint_id, board_id):
 @app.route('/api/jira/all_boards', methods=['GET'])
 def get_all_boards():
     try:
-        if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
+        credentials = get_jira_credentials()
+        if not credentials:
             return jsonify({'error': 'Missing Jira credentials'}), 500
         
         # List of specific board IDs you want to fetch
@@ -1004,7 +1016,7 @@ def get_all_boards():
         boards = []
         
         for board_id in board_ids:
-            board_url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}"
+            board_url = f"{credentials['url']}/rest/agile/1.0/board/{board_id}"
             response = make_jira_request(board_url)
             if response and response.status_code == 200:
                 board_data = response.json()
@@ -1027,7 +1039,8 @@ def get_all_boards():
 @app.route('/api/jira/sprint_trends', methods=['GET'])
 def get_sprint_trends():
     try:
-        if not all([JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN]):
+        credentials = get_jira_credentials()
+        if not credentials:
             return jsonify({'error': 'Missing Jira credentials'}), 500
 
         board_id = request.args.get('board_id', '').strip()
@@ -1039,7 +1052,7 @@ def get_sprint_trends():
         start_at = 0
         max_results = 20
         while True:
-            sprints_url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}&state=active,closed"
+            sprints_url = f"{credentials['url']}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}&state=active,closed"
             response = make_jira_request(sprints_url)
             if not response or response.status_code != 200:
                 return jsonify({'error': 'Failed to fetch sprints from Jira'}), 500
@@ -1061,7 +1074,7 @@ def get_sprint_trends():
         sprint_details = []
         for sprint in sprints:
             sprint_id = sprint['id']
-            sprint_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}"
+            sprint_url = f"{credentials['url']}/rest/agile/1.0/sprint/{sprint_id}"
             sprint_resp = make_jira_request(sprint_url)
             if not sprint_resp or sprint_resp.status_code != 200:
                 logger.debug(f"Skipping sprint {sprint_id}: failed to fetch details")
@@ -1075,7 +1088,7 @@ def get_sprint_trends():
             sprint_end_dt = parser.parse(sprint_end)
 
             # Get all issues in the sprint
-            issues_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=100"
+            issues_url = f"{credentials['url']}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=100"
             issues_resp = make_jira_request(issues_url)
             if not issues_resp or issues_resp.status_code != 200:
                 logger.debug(f"Skipping sprint {sprint_id}: failed to fetch issues")
@@ -1090,7 +1103,7 @@ def get_sprint_trends():
             for issue in issues:
                 issue_key = issue['key']
                 # Fetch changelog for the issue
-                issue_url = f"{JIRA_URL}/rest/api/2/issue/{issue_key}?expand=changelog"
+                issue_url = f"{credentials['url']}/rest/api/2/issue/{issue_key}?expand=changelog"
                 issue_resp = make_jira_request(issue_url)
                 if not issue_resp or issue_resp.status_code != 200:
                     logger.debug(f"Skipping issue {issue_key}: failed to fetch changelog")
@@ -1177,7 +1190,7 @@ def process_sprint_trends(task_id, board_id):
         start_at = 0
         max_results = 20
         while True:
-            sprints_url = f"{JIRA_URL}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}&state=active,closed"
+            sprints_url = f"{credentials['url']}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}&state=active,closed"
             response = make_jira_request(sprints_url)
             if not response or response.status_code != 200:
                 sprint_trends_tasks[task_id]['status'] = 'error'
@@ -1197,7 +1210,7 @@ def process_sprint_trends(task_id, board_id):
         for sprint in sprints_to_add:
             sprint_id = sprint['id']
             sprint_name = sprint['name']
-            sprint_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}"
+            sprint_url = f"{credentials['url']}/rest/agile/1.0/sprint/{sprint_id}"
             sprint_resp = make_jira_request(sprint_url)
             if not sprint_resp or sprint_resp.status_code != 200:
                 logger.debug(f"Skipping sprint {sprint_id}: failed to fetch details")
@@ -1209,7 +1222,7 @@ def process_sprint_trends(task_id, board_id):
                 continue
             from dateutil import parser
             sprint_end_dt = parser.parse(sprint_end)
-            issues_url = f"{JIRA_URL}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=100"
+            issues_url = f"{credentials['url']}/rest/agile/1.0/sprint/{sprint_id}/issue?maxResults=100"
             issues_resp = make_jira_request(issues_url)
             if not issues_resp or issues_resp.status_code != 200:
                 logger.debug(f"Skipping sprint {sprint_id}: failed to fetch issues")
@@ -1221,7 +1234,7 @@ def process_sprint_trends(task_id, board_id):
             not_completed_count = 0
             for issue in issues:
                 issue_key = issue['key']
-                issue_url = f"{JIRA_URL}/rest/api/2/issue/{issue_key}?expand=changelog"
+                issue_url = f"{credentials['url']}/rest/api/2/issue/{issue_key}?expand=changelog"
                 issue_resp = make_jira_request(issue_url)
                 if not issue_resp or issue_resp.status_code != 200:
                     logger.debug(f"Skipping issue {issue_key}: failed to fetch changelog")
@@ -1542,6 +1555,169 @@ def export_sprint_report_csv():
     except Exception as e:
         logger.error(f"Error exporting sprint report CSV: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/jira_sprint_report', methods=['POST'])
+def start_sprint_report():
+    """Start a background sprint report task for a board"""
+    try:
+        data = request.get_json()
+        board_id = data.get('board_id', '').strip()
+        
+        if not board_id:
+            return jsonify({'error': 'board_id is required'}), 400
+        
+        # Generate unique task ID
+        task_id = str(uuid.uuid4())
+        
+        # Initialize task status
+        sprint_report_tasks[task_id] = {
+            'status': 'in_progress',
+            'progress': 0,
+            'result': None,
+            'error': None,
+            'board_id': board_id,
+            'started_at': datetime.now().isoformat()
+        }
+        
+        # Start background task
+        def run_sprint_report():
+            try:
+                # Update status to fetching data
+                sprint_report_tasks[task_id]['status'] = 'fetching_data'
+                sprint_report_tasks[task_id]['progress'] = 10
+                
+                # Get credentials
+                credentials = get_jira_credentials()
+                if not credentials:
+                    sprint_report_tasks[task_id]['status'] = 'error'
+                    sprint_report_tasks[task_id]['error'] = 'Missing Jira credentials. Please configure them in Settings.'
+                    return
+                
+                # Update status to in progress
+                sprint_report_tasks[task_id]['status'] = 'in_progress'
+                sprint_report_tasks[task_id]['progress'] = 30
+                
+                # Use the exact same logic as the working GET endpoint
+                print(f"DEBUG: Starting sprint report generation for board {board_id}")
+                
+                # Step 1: Get ALL sprints from the board (same as GET endpoint)
+                all_sprints = []
+                start_at = 0
+                max_results = 50
+                
+                while True:
+                    sprints_url = f"{credentials['url']}/rest/agile/1.0/board/{board_id}/sprint?startAt={start_at}&maxResults={max_results}"
+                    response = make_jira_request(sprints_url)
+                    if not response or response.status_code != 200:
+                        sprint_report_tasks[task_id]['status'] = 'error'
+                        sprint_report_tasks[task_id]['error'] = 'Failed to fetch sprints from Jira'
+                        return
+                    data = response.json()
+                    
+                    all_sprints.extend(data.get('values', []))
+                                
+                    if data.get('isLast', True) or len(data.get('values', [])) == 0:
+                        break
+                    start_at += max_results
+
+                print(f"DEBUG: Total sprints fetched: {len(all_sprints)}")
+                
+                # Filter for CLOSED sprints only and sort by endDate (same as GET endpoint)
+                closed_sprints = []
+                for sprint in all_sprints:
+                    if sprint.get('state') == 'closed' and sprint.get('endDate'):
+                        closed_sprints.append(sprint)
+                
+                print(f"DEBUG: Total closed sprints: {len(closed_sprints)}")
+                
+                # Sort by endDate (most recent first)
+                closed_sprints.sort(key=lambda x: x.get('endDate', ''), reverse=True)
+                
+                # Take the top 15 most recent closed sprints
+                top_15_closed_sprints = closed_sprints[:15]
+                print(f"DEBUG: Using top {len(top_15_closed_sprints)} recent closed sprints")
+                
+                if not top_15_closed_sprints:
+                    print(f"DEBUG: No closed sprints found, using dummy data")
+                    result = [{
+                        "Sprint Name": "No Closed Sprints Found",
+                        "Start Date": "N/A",
+                        "End Date": "N/A",
+                        "Status": "N/A",
+                        "Initial Planned": 0,
+                        "Completed": 0,
+                        "Not Completed": 0,
+                        "Added During Sprint": 0,
+                        "Removed During Sprint": 0,
+                        "Initial Planned SP": 0,
+                        "Completed SP": 0,
+                        "Completion %": "N/A",
+                        "Insight": "No closed sprints found for this board"
+                    }]
+                else:
+                    # Update progress to show we're analyzing
+                    sprint_report_tasks[task_id]['progress'] = 50
+                    sprint_report_tasks[task_id]['current_sprints'] = 0
+                    sprint_report_tasks[task_id]['total_sprints'] = len(top_15_closed_sprints)
+                    
+                    # Step 2: Analyze each sprint (same as GET endpoint)
+                    result = []
+                    from scripts.jira_sprint_report import analyze_sprint
+                    
+                    for i, sprint in enumerate(top_15_closed_sprints):
+                        print(f"DEBUG: Analyzing sprint {i+1}/{len(top_15_closed_sprints)}: {sprint.get('name', 'Unknown')}")
+                        
+                        # Use the same analyze_sprint function as the GET endpoint
+                        sprint_analysis = analyze_sprint(sprint, board_id)
+                        if sprint_analysis:
+                            result.append(sprint_analysis)
+                            print(f"DEBUG: Sprint analysis successful: {sprint_analysis.get('Sprint Name', 'Unknown')} - {sprint_analysis.get('Initial Planned', 0)} planned, {sprint_analysis.get('Completed', 0)} completed")
+                        else:
+                            print(f"DEBUG: Sprint analysis failed for {sprint.get('name', 'Unknown')}")
+                        
+                        # Update progress for each sprint
+                        progress = 50 + int((i / len(top_15_closed_sprints)) * 40)  # 50% to 90%
+                        sprint_report_tasks[task_id]['progress'] = progress
+                        sprint_report_tasks[task_id]['current_sprints'] = i + 1
+                        
+                        # Small delay to ensure frontend can see progress updates
+                        import time
+                        time.sleep(0.2)
+                    
+                    print(f"DEBUG: Report generated with {len(result)} sprints")
+                
+                print(f"DEBUG: Final result: {result}")
+                print(f"DEBUG: result type: {type(result)}")
+                print(f"DEBUG: result length: {len(result) if result else 'None'}")
+                
+                # Update status to completed
+                sprint_report_tasks[task_id]['status'] = 'completed'
+                sprint_report_tasks[task_id]['progress'] = 100
+                sprint_report_tasks[task_id]['current_sprints'] = sprint_report_tasks[task_id].get('total_sprints', 15)
+                sprint_report_tasks[task_id]['result'] = result
+                
+                print(f"DEBUG: Task {task_id} result set to: {sprint_report_tasks[task_id]['result']}")
+                
+            except Exception as e:
+                print(f"DEBUG: Exception in run_sprint_report: {str(e)}")
+                print(f"DEBUG: Exception type: {type(e)}")
+                import traceback
+                print(f"DEBUG: Traceback: {traceback.format_exc()}")
+                sprint_report_tasks[task_id]['status'] = 'error'
+                sprint_report_tasks[task_id]['error'] = str(e)
+        
+        # Start the background task
+        import threading
+        thread = threading.Thread(target=run_sprint_report)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({'task_id': task_id})
+        
+    except Exception as e:
+        logger.error(f"Error starting sprint report: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/capacity/analyze', methods=['POST'])
 def start_capacity_analysis():
@@ -2693,43 +2869,7 @@ def create_share_link():
         logger.error(f"Error creating share link: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/share/<share_id>')
-def view_shared_report(share_id):
-    """View a shared capacity analysis report"""
-    try:
-        if share_id not in shared_reports:
-            return render_template('error.html', 
-                                 error_title="Report Not Found",
-                                 error_message="The shared report link is invalid or has expired."), 404
-        
-        shared_report = shared_reports[share_id]
-        
-        # Check if expired
-        expiration_date = datetime.fromisoformat(shared_report['expires_at'])
-        if datetime.now() > expiration_date:
-            # Clean up expired report
-            del shared_reports[share_id]
-            return render_template('error.html',
-                                 error_title="Report Expired",
-                                 error_message="This shared report link has expired."), 410
-        
-        # Increment access count
-        shared_report['access_count'] += 1
-        
-        # Render the shared report
-        return render_template('shared_report.html', 
-                             report_data=shared_report['report_data'],
-                             share_info={
-                                 'created_at': shared_report['created_at'],
-                                 'expires_at': shared_report['expires_at'],
-                                 'access_count': shared_report['access_count']
-                             })
-        
-    except Exception as e:
-        logger.error(f"Error viewing shared report: {str(e)}")
-        return render_template('error.html',
-                             error_title="Error",
-                             error_message="An error occurred while loading the report."), 500
+# Shared report functionality moved to React frontend
 
 @app.route('/api/capacity/upload-screenshot', methods=['POST'])
 def upload_screenshot():

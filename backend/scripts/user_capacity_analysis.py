@@ -66,7 +66,7 @@ def get_user_issues(user_email, weeks_back=8):
         updated >= "{start_date_str}"
         '''
         
-        url = f"{jira_url}/rest/api/2/search"
+        url = f"{jira_url}/rest/api/3/search/jql"
         params = {
             "jql": jql,
             "maxResults": 100,  # Keep batch size at 100 for API efficiency
@@ -81,6 +81,10 @@ def get_user_issues(user_email, weeks_back=8):
         while True:
             params["startAt"] = start_at
             response = requests.get(url, headers=headers, auth=auth, params=params)
+            if response.status_code == 410:
+                print(f"HTTP 410 error - JIRA API endpoint deprecated or authentication failed")
+                print(f"Response: {response.text}")
+                return {'error': 'JIRA API authentication failed. Please check your credentials in Settings.'}
             response.raise_for_status()
             data = response.json()
             

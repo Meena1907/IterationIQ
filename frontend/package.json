@@ -45,5 +45,5 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://backend-dev:5000"
+  "proxy": "http://10.82.144.108:8080"
 }

@@ -65,6 +65,9 @@ const SprintReport = () => {
   const [totalSprints, setTotalSprints] = useState(0);
   const [filteredCount, setFilteredCount] = useState(0);
   const [progress, setProgress] = useState({ current: 0, total: 15, message: '' });
+  const [currentTaskId, setCurrentTaskId] = useState(null);
+  const [progressInterval, setProgressInterval] = useState(null);
+  const [pollingStartTime, setPollingStartTime] = useState(null);
   
   // Share and screenshot functionality
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -101,54 +104,125 @@ const SprintReport = () => {
       return;
     }
 
+    console.log('🚀 STEP 1: Starting sprint report generation for board:', boardId); // Debug log
     setLoading(true);
     setError('');
     setSprintData([]);
     setProgress({ current: 0, total: 15, message: 'Starting analysis...' });
 
     try {
-      const response = await fetch(`/api/jira_sprint_report_stream?board_id=${boardId}`);
+      console.log('🚀 STEP 2: Making POST request to start sprint report'); // Debug log
+      const response = await fetch('/api/jira_sprint_report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          board_id: boardId
+        })
+      });
+      
+      console.log('🚀 STEP 3: Response received:', response.status, response.statusText); // Debug log
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch sprint data');
+        throw new Error(data.error || 'Failed to start sprint report');
       }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.type === 'sprint_result') {
-                setSprintData(prev => [...prev, data.data]);
-              } else if (data.type === 'progress') {
-                if (data.current && data.total) {
-                  setProgress({ current: data.current, total: data.total, message: data.message || '' });
-                } else if (data.message) {
-                  setProgress(prev => ({ ...prev, message: data.message }));
-                }
-              }
-            } catch (e) {
-              // Ignore parsing errors for non-JSON lines
-            }
-          }
-        }
-      }
+      
+      console.log('🚀 STEP 4: Task started, task_id:', data.task_id); // Debug log
+      setCurrentTaskId(data.task_id);
+      startProgressPolling(data.task_id);
+      
     } catch (err) {
+      console.error('🚀 STEP 20: Sprint report generation failed:', err); // Debug log
       setError(err.message || 'Failed to generate sprint report');
-    } finally {
       setLoading(false);
     }
   };
+
+
+  // Progress polling (same pattern as capacity analysis)
+  const startProgressPolling = (taskId) => {
+    console.log('🚀 STEP 5: Starting progress polling for task:', taskId); // Debug log
+    setPollingStartTime(Date.now());
+    const interval = setInterval(async () => {
+      try {
+        // Check for timeout (5 minutes)
+        if (pollingStartTime && Date.now() - pollingStartTime > 300000) {
+          console.log('🚀 STEP TIMEOUT: Polling timeout reached');
+          clearInterval(interval);
+          setLoading(false);
+          setError('Sprint report generation timed out. Please try again.');
+          return;
+        }
+        
+        console.log('🚀 STEP 6: Polling progress for task:', taskId); // Debug log
+        const response = await fetch(`/api/jira/sprint_report_progress?task_id=${taskId}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get progress');
+        }
+        
+        console.log('🚀 STEP 7: Progress data received:', data); // Debug log
+        
+        if (data.status === 'fetching_data') {
+          setProgress({ current: 0, total: data.total_sprints || 15, message: 'Fetching sprint data from JIRA...' });
+        } else if (data.status === 'in_progress') {
+          // Use real backend progress data if available, otherwise use percentage
+          if (data.current_sprints !== undefined && data.total_sprints !== undefined) {
+            setProgress({ current: data.current_sprints, total: data.total_sprints, message: 'Analyzing sprint data...' });
+          } else {
+            // Fallback to percentage-based progress
+            const progressPercent = data.progress || 0;
+            const currentSprints = Math.round((progressPercent / 100) * 15);
+            setProgress({ current: currentSprints, total: 15, message: 'Analyzing sprint data...' });
+          }
+          
+          // Show partial results as they come in
+          if (data.partial_results && data.partial_results.length > 0) {
+            setSprintData(data.partial_results);
+          }
+          
+          // Log progress for debugging
+          console.log('🚀 STEP 7.5: Progress update:', {
+            progress: data.progress,
+            current_sprints: data.current_sprints,
+            total_sprints: data.total_sprints,
+            status: data.status
+          });
+        } else if (data.status === 'completed') {
+          console.log('🚀 STEP 8: Sprint report completed, results:', data.result); // Debug log
+          setProgress({ current: data.total_sprints || 15, total: data.total_sprints || 15, message: 'Analysis completed!' });
+          clearInterval(interval);
+          setLoading(false);
+          setSprintData(data.result || []);
+        } else if (data.status === 'error') {
+          console.error('🚀 STEP 9: Sprint report error:', data.error); // Debug log
+          clearInterval(interval);
+          setLoading(false);
+          setError(data.error || 'Sprint report failed');
+        }
+        
+      } catch (error) {
+        console.error('🚀 STEP 10: Error polling progress:', error); // Debug log
+        clearInterval(interval);
+        setLoading(false);
+        setError('Failed to get sprint report progress');
+      }
+    }, 2000);
+    
+    setProgressInterval(interval);
+  };
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+    };
+  }, [progressInterval]);
 
   // Filter sprint data based on search term
   useEffect(() => {
@@ -551,11 +625,11 @@ const SprintReport = () => {
       )}
 
       {/* Progress Display */}
-      {loading && progress.current > 0 && (
+      {loading && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Box display="flex" alignItems="center" gap={2}>
-              <CircularProgress size={24} />
+              <CircularProgress size={24} color="primary" />
               <Box sx={{ flexGrow: 1 }}>
                 <Typography variant="body2" color="text.secondary">
                   {progress.message}
@@ -1400,7 +1474,7 @@ const SprintReport = () => {
                 <br />
                 <em>Criteria:</em> Completion % ≥ 80% AND scope stability &lt; 20%
                 <br />
-                <em>Calculation:</em> <code>completionPercent >= 80 &#38;&#38; scopeChangePercent &#60; 20</code>
+                <em>Calculation:</em> <code>completionPercent {'>='} 80 {'&&'} scopeChangePercent {'<'} 20</code>
                 <br />
                 <em>Result:</em> Green checkmark with "Good velocity" message
               </Typography>
@@ -1410,7 +1484,7 @@ const SprintReport = () => {
                 <br />
                 <em>Criteria:</em> Completion % between 50-79%
                 <br />
-                <em>Calculation:</em> <code>completionPercent >= 50 &#38;&#38; completionPercent &#60; 80</code>
+                <em>Calculation:</em> <code>completionPercent {'>='} 50 {'&&'} completionPercent {'<'} 80</code>
                 <br />
                 <em>Result:</em> Orange exclamation with "Moderate delivery rate" message
               </Typography>

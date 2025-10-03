@@ -63,7 +63,9 @@ const BestPractices = () => {
           ],
           resources: [
             { title: "JQL Functions Reference", url: "https://www.atlassian.com/software/jira/guides/search/jql-functions", icon: <DocumentIcon /> },
-            { title: "JQL Cookbook", url: "https://www.atlassian.com/software/jira/guides/search/jql-cookbook", icon: <BookIcon /> }
+            { title: "JQL Cookbook", url: "https://www.atlassian.com/software/jira/guides/search/jql-cookbook", icon: <BookIcon /> },
+            { title: "Jira Administration", url: "https://www.linkedin.com/learning/jira-administration", icon: <BookIcon /> },
+            { title: "Agile Project Management with Jira", url: "https://www.linkedin.com/learning/agile-project-management-with-jira", icon: <BookIcon /> }
           ]
         },
         {
@@ -137,7 +139,9 @@ const BestPractices = () => {
           ],
           resources: [
             { title: "Sprint Planning Guide", url: "https://www.atlassian.com/agile/scrum/sprint-planning", icon: <DocumentIcon /> },
-            { title: "Agile Project Management", url: "https://www.atlassian.com/agile/project-management", icon: <BookIcon /> }
+            { title: "Agile Project Management", url: "https://www.atlassian.com/agile/project-management", icon: <BookIcon /> },
+            { title: "Agile Project Management with Jira", url: "https://www.linkedin.com/learning/agile-project-management-with-jira", icon: <BookIcon /> },
+            { title: "Scrum Master Certification", url: "https://www.linkedin.com/learning/scrum-master-certification", icon: <BookIcon /> }
           ]
         }
       ]
@@ -156,7 +160,9 @@ const BestPractices = () => {
           ],
           resources: [
             { title: "Scrum Guide", url: "https://scrumguides.org/scrum-guide.html", icon: <DocumentIcon /> },
-            { title: "Agile Coaching", url: "https://www.atlassian.com/agile/scrum", icon: <BookIcon /> }
+            { title: "Agile Coaching", url: "https://www.atlassian.com/agile/scrum", icon: <BookIcon /> },
+            { title: "Scrum Master Certification", url: "https://www.linkedin.com/learning/scrum-master-certification", icon: <BookIcon /> },
+            { title: "Agile Leadership", url: "https://www.linkedin.com/learning/agile-leadership", icon: <BookIcon /> }
           ]
         }
       ]
@@ -175,7 +181,9 @@ const BestPractices = () => {
           ],
           resources: [
             { title: "Development Workflow", url: "https://www.atlassian.com/software/jira/guides/getting-started/basics", icon: <DocumentIcon /> },
-            { title: "Git Integration", url: "https://www.atlassian.com/software/jira/guides/getting-started/git-integration", icon: <BookIcon /> }
+            { title: "Git Integration", url: "https://www.atlassian.com/software/jira/guides/getting-started/git-integration", icon: <BookIcon /> },
+            { title: "Git Essential Training", url: "https://www.linkedin.com/learning/git-essential-training", icon: <BookIcon /> },
+            { title: "Agile Development with Jira", url: "https://www.linkedin.com/learning/agile-development-with-jira", icon: <BookIcon /> }
           ]
         }
       ]
@@ -194,7 +202,9 @@ const BestPractices = () => {
           ],
           resources: [
             { title: "Testing Best Practices", url: "https://www.atlassian.com/software/jira/guides/getting-started/testing", icon: <DocumentIcon /> },
-            { title: "Quality Assurance", url: "https://www.atlassian.com/software/jira/guides/getting-started/quality-assurance", icon: <BookIcon /> }
+            { title: "Quality Assurance", url: "https://www.atlassian.com/software/jira/guides/getting-started/quality-assurance", icon: <BookIcon /> },
+            { title: "Software Testing Fundamentals", url: "https://www.linkedin.com/learning/software-testing-fundamentals", icon: <BookIcon /> },
+            { title: "Agile Testing", url: "https://www.linkedin.com/learning/agile-testing", icon: <BookIcon /> }
           ]
         }
       ]
@@ -213,7 +223,9 @@ const BestPractices = () => {
           ],
           resources: [
             { title: "Requirements Management", url: "https://www.atlassian.com/software/jira/guides/getting-started/requirements", icon: <DocumentIcon /> },
-            { title: "Business Analysis", url: "https://www.atlassian.com/software/jira/guides/getting-started/business-analysis", icon: <BookIcon /> }
+            { title: "Business Analysis", url: "https://www.atlassian.com/software/jira/guides/getting-started/business-analysis", icon: <BookIcon /> },
+            { title: "Business Analysis Fundamentals", url: "https://www.linkedin.com/learning/business-analysis-fundamentals", icon: <BookIcon /> },
+            { title: "Agile Business Analysis", url: "https://www.linkedin.com/learning/agile-business-analysis", icon: <BookIcon /> }
           ]
         }
       ]
