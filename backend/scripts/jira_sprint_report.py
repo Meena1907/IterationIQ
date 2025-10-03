@@ -268,7 +268,6 @@ def analyze_sprint(sprint, board_id=None):
             else:
                 removed_during_sprint = 0
 
-    
             # --- Handle completed story points ---
             if completed_issues_estimate_sum.get("value") is not None:
                 completed_sp = float(completed_issues_estimate_sum.get("value", 0) or 0)
@@ -282,11 +281,6 @@ def analyze_sprint(sprint, board_id=None):
                         completed_sp += float(story_points)
                 print(f"DEBUG - Calculated completed_sp manually: {completed_sp}")
 
-                # Ensure added_keys and removed_keys are sets for membership checks
-                added_keys_set = set(added_keys.keys()) if isinstance(added_keys, dict) else set(added_keys)
-                removed_keys_set = set(removed_keys) if isinstance(removed_keys, (list, tuple)) else set()
-
-
             # --- Calculate initial planned SP using existing fields ---
             initial_planned_sp = 0
             for issue in completed_issues_data + incomplete_issues_data:
@@ -295,7 +289,7 @@ def analyze_sprint(sprint, board_id=None):
                                 issue.get('fields', {}).get('customfield_10002') or 0)
                 if story_points:
                     # Include only issues that were planned at the START of the sprint
-                    if (key not in added_keys_set) or (key in removed_keys_set):
+                    if key not in added_keys or key in removed_keys:
                         initial_planned_sp += float(story_points)
 
             print(f"DEBUG - Calculated initial_planned_sp correctly: {initial_planned_sp}")
